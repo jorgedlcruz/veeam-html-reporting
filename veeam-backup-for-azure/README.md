@@ -11,7 +11,7 @@ We use Veeam Backup for Microsoft Azure v2.0 RESTfulAPI to reduce the workload a
 ----------
 
 ### Getting started
-You can follow the steps on the next Blog Post - TBD
+You can follow the steps on the next Blog Post - [https://jorgedelacruz.uk/2021/06/04/veeam-html-daily-report-for-veeam-backup-for-azure-is-now-available-community-project/](https://jorgedelacruz.uk/2021/06/04/veeam-html-daily-report-for-veeam-backup-for-azure-is-now-available-community-project/)
 
 Or try with this simple steps:
 * Download the veeam_azure_email_report.sh file and change the parameters under Configuration, like username/password, etc. with your real data
