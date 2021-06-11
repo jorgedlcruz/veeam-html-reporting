@@ -138,7 +138,6 @@ echo "<td colspan="4" style='width:80%; border:none; background-color:$bcolor; c
 echo '<div class="x_jobDescription" style="margin-top:5px; font-size:$fontsize2"></div>' >> $html
 echo "</td>" >> $html
 echo "<td colspan="2" style='border:none; padding:0px; font-family:Tahoma; font-size:$fontsize2; background-color:$bcolor; color:White; font-weight:bold; font-size:$fontsize1; height:70px; vertical-align:bottom; padding:0 0 17px 15px; font-family:Tahoma'>$SessionStatus" >> $html
-echo "<div class='x_jobDescription" style="margin-top:5px; font-size:$fontsize2'>$SessionPolicyProtectedInstances of $SessionPolicyProtectedInstances VMs processed</div>" >> $html
 echo "</td>" >> $html
 echo "</tr>" >> $html
 echo "<tr>" >> $html
