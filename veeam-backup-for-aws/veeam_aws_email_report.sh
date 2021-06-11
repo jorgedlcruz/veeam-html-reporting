@@ -41,7 +41,6 @@ color4="#e3e3e3"
 fontsize1="20px"
 fontsize2="20px"
 fontsize3="22px"
-styleworkload="padding:2px 3px 2px 3px; vertical-align:top; border:1px solid"
 
 ## Login and Token
 
