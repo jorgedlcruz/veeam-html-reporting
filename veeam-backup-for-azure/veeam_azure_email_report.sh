@@ -184,15 +184,12 @@ echo "</tr>" >> $html
         SessionLogStatus=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].status")
         case $SessionLogStatus in
             Success)
-                jobStatus="1"
                 bcolor="#37872D"
             ;;
             Warning)
-                jobStatus="2"
                 bcolor="#FA6400"
             ;;
             Failed)
-                jobStatus="3"
                 bcolor="#C4162A"
             ;;
             esac
@@ -249,5 +246,5 @@ echo "<br/>" >> $html
 done
 
 #Sending Email to the user
-cat $html | mail -s "`hostname` - Daily Veeam Backup for Azure Report" -a "MIME-Version: 1.0" -a "Content-Type: text/html" -a "From: Veeam Backup for Azure <$email_add>" $email_add
+cat $html | s-nail -M "text/html" -s "$veeamBackupAzureServer - Daily Veeam Backup for Azure Report" $email_add
 

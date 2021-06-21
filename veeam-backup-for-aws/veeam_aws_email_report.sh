@@ -343,5 +343,5 @@ echo "<br/>" >> $html
 done
 
 #Sending Email to the user
-cat $html | mail -s "`hostname` - Daily Veeam Backup for AWS Report" -a "MIME-Version: 1.0" -a "Content-Type: text/html" -a "From: Veeam Backup for AWS <$email_add>" $email_add
+cat $html | s-nail -M "text/html" -s "$veeamBackupAzureServer - Daily Veeam Backup for Azure Report" $email_add
 

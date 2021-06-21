@@ -21,6 +21,25 @@ Or try with this simple steps:
 * You will need mailutils on your server in order to send Emails - And most likely have a proper SmartHost to rely your email
 * Enjoy :)
 
+**Extra**
+You will need an extra package to be able to send secure emails, that will always land without problems:
+
+``sudo apt-get install -y s-nail``
+
+This will allow us to use a better, and modern, way of sending emails. Now with the package downloaded, we need to edit the system settings for email:
+
+``vi ~/.mailrc``
+
+Inside the file, which might be empty first time you open it, introduce the next:
+
+``set smtp-use-starttls
+set ssl-verify=ignore
+set smtp=smtp://YOURSMTPSERVER:587
+set smtp-auth=login
+set smtp-auth-user="YOURUSER@YOURDOMAIN.COM"
+set smtp-auth-password="YOURPASSWORD"
+set from="YOURFROMEMAIL@YOURDOMAIN.COM"``
+
 ----------
 
 ### Additional Information
