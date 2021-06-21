@@ -32,13 +32,19 @@ This will allow us to use a better, and modern, way of sending emails. Now with 
 
 Inside the file, which might be empty first time you open it, introduce the next:
 
-``set smtp-use-starttls
-set ssl-verify=ignore
-set smtp=smtp://YOURSMTPSERVER:587
-set smtp-auth=login
-set smtp-auth-user="YOURUSER@YOURDOMAIN.COM"
-set smtp-auth-password="YOURPASSWORD"
-set from="YOURFROMEMAIL@YOURDOMAIN.COM"``
+``set smtp-use-starttls``
+
+``set ssl-verify=ignore``
+
+``set smtp=smtp://YOURSMTPSERVER:587``
+
+``set smtp-auth=login``
+
+``set smtp-auth-user="YOURUSER@YOURDOMAIN.COM"``
+
+``set smtp-auth-password="YOURPASSWORD"``
+
+``set from="YOURFROMEMAIL@YOURDOMAIN.COM"``
 
 ----------
 
