@@ -343,5 +343,5 @@ echo "<br/>" >> $html
 done
 
 #Sending Email to the user
-cat $html | s-nail -M "text/html" -s "$veeamBackupAzureServer - Daily Veeam Backup for Azure Report" $email_add
+cat $html | s-nail -M "text/html" -s "$veeamBackupAWSServer - Daily Veeam Backup for AWS Report" $email_add
 
