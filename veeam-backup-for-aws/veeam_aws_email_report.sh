@@ -209,6 +209,9 @@ echo "</tr>" >> $html
             Failed)
                 bcolor="#C4162A"
             ;;
+            Error)
+                bcolor="#C4162A"
+            ;;
         esac
         
         case $SessionExtendedType in
