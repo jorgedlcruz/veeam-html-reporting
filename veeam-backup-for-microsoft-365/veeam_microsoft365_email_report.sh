@@ -204,9 +204,8 @@ echo "<br/>" >> $html
 echo "</body>" >> $html
 echo "</html>" >> $html
 #Sending Email to the user
-cat $html | s-nail -M "text/html" -s "$veeamRestServer - Daily Veeam Backup for Microsoft 365 Report" $email_add
+cat $html | s-nail -M "text/html" -s "$veeamRestServer - Backup Job: $SessionPolicyName - Daily Veeam Backup for Microsoft 365 Report" $email_add
     arrayJobs=$arrayJobs+1
-    #EMAIL HERE
 done
 
 
