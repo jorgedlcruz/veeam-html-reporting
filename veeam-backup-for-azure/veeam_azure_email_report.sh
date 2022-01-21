@@ -9,8 +9,8 @@
 ##      .Notes
 ##      NAME:  veeam_azure_email_report.sh
 ##      ORIGINAL NAME: veeam_azure_email_report.sh
-##      LASTEDIT: 04/06/2021
-##      VERSION: 1.0
+##      LASTEDIT: 21/01/2022
+##      VERSION: 3.0
 ##      KEYWORDS: Veeam, HTML, Report, Azure
    
 ##      .Link
@@ -49,13 +49,13 @@ veeamBearer=$(curl -X POST --header "Content-Type: application/x-www-form-urlenc
 ##
 # Veeam Backup for Azure Overview. This part will check VBA Overview
 ##
-veeamVBAURL="$veeamBackupAzureServer:$veeamBackupAzurePort/api/v2/system/about"
+veeamVBAURL="$veeamBackupAzureServer:$veeamBackupAzurePort/api/v3/system/about"
 veeamVBAOverviewUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H  "accept: application/json" 2>&1 -k --silent)
 
     version=$(echo "$veeamVBAOverviewUrl" | jq --raw-output ".serverVersion")
     workerversion=$(echo "$veeamVBAOverviewUrl" | jq --raw-output ".workerVersion")
 
-veeamVBAURL="$veeamBackupAzureServer:$veeamBackupAzurePort/api/v2/system/serverInfo"
+veeamVBAURL="$veeamBackupAzureServer:$veeamBackupAzurePort/api/v3/system/serverInfo"
 veeamVBAOverviewUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H  "accept: application/json" 2>&1 -k --silent)
 
     serverName=$(echo "$veeamVBAOverviewUrl" | jq --raw-output ".serverName")
@@ -64,7 +64,7 @@ veeamVBAOverviewUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamB
 ##
 # Veeam Backup for Azure Sessions. This part will check VBA Sessions
 ##
-veeamVBAURL="$veeamBackupAzureServer:$veeamBackupAzurePort/api/v2/jobSessions?Types=PolicyBackup&Types=PolicySnapshot&FromUtc=$reportDateFrom&ToUtc=$reportDateTo"
+veeamVBAURL="$veeamBackupAzureServer:$veeamBackupAzurePort/api/v3/jobSessions?Types=PolicyBackup&Types=PolicySnapshot&FromUtc=$reportDateFrom&ToUtc=$reportDateTo"
 veeamVBASessionsBackupUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H  "accept: application/json" 2>&1 -k --silent)
 
 declare -i arraysessionsbackup=0
@@ -176,7 +176,7 @@ echo "</tr>" >> $html
     ##
     # Veeam Backup for Azure Detailed Sessions. This part will check the Instances inside the Session
     ##
-    veeamVBAURL="$veeamBackupAzureServer:$veeamBackupAzurePort/api/v2/jobSessions/$SessionID/log"
+    veeamVBAURL="$veeamBackupAzureServer:$veeamBackupAzurePort/api/v3/jobSessions/$SessionID/log"
     veeamVBASessionsLogBackupUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H  "accept: application/json" 2>&1 -k --silent)
 
     declare -i arraysessionslogbackup=0
@@ -200,9 +200,9 @@ echo "</tr>" >> $html
             SessionLogVMTransferred="N/A"
             SessionLogType="Snapshot"
             ;;
-            Processing*)
-            SessionLogVMName=$(echo $SessionLogMessage |awk '{print $2}')
-            SessionLogVMTransferred=$(echo $SessionLogMessage | awk -F % '{print $2}' | awk -F transferred '{print $1}')
+            Backing*)
+            SessionLogVMName=$(echo $SessionLogMessage |awk '{print $3}')
+            SessionLogVMTransferred=$(echo $SessionLogMessage | awk -F % '{print $2}' | sed 's/[()]//g' | awk -F transferred '{print $1}')
             SessionLogType="Backup"
             ;;
             Backup*)
