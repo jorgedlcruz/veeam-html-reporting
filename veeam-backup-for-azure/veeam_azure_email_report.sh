@@ -9,7 +9,7 @@
 ##      .Notes
 ##      NAME:  veeam_azure_email_report.sh
 ##      ORIGINAL NAME: veeam_azure_email_report.sh
-##      LASTEDIT: 21/01/2022
+##      LASTEDIT: 22/01/2022
 ##      VERSION: 3.0
 ##      KEYWORDS: Veeam, HTML, Report, Azure
    
@@ -90,6 +90,7 @@ for row in $(echo "$veeamVBASessionsBackupUrl" | jq -r '.results[].id'); do
     SessionDurationB=$(date -d $SessionDuration '+%H:%M:%S')
     SessionStartTime=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].executionStartTime")
     SessionStartTimeB=$(date -d $SessionStartTime '+%r')
+    SessionDurationReport=$(date -d $SessionStartTime '+%A, %B %d, %Y %r')
     SessionStopTime=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].executionStopTime")
     SessionStopTimeB=$(date -d $SessionStopTime '+%r')
     SessionPolicyID=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].backupJobInfo.policyId")
@@ -123,7 +124,7 @@ echo '<table class="x_inner" style="margin:0px; border-collapse:collapse" width=
 echo "<tbody>" >> $html
 echo '<tr style="height:17px">' >> $html
 echo "<td colspan='6' class='_sessionDetails' style='border-style:solid; border-color:$color1; border-width:1px 1px 0 1px; height:35px; background-color:$color2; font-size:$fontsize3; vertical-align:middle; padding:5px 0 0 15px; color:$color3; font-family:Tahoma'>" >> $html
-echo "<span>$reportDate</span>" >> $html
+echo "<span>$SessionDurationReport</span>" >> $html
 echo "</td>" >> $html
 echo "</tr>" >> $html
 echo '<tr style="height:17px">' >> $html
@@ -194,23 +195,11 @@ echo "</tr>" >> $html
             ;;
             esac
         SessionLogMessage=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].message")
-        case "$SessionLogMessage" in
-            Snapshot*)
-            SessionLogVMName=$(echo $SessionLogMessage |awk '{print $4}')
-            SessionLogVMTransferred="N/A"
-            SessionLogType="Snapshot"
-            ;;
-            Backing*)
+        if [[ "$SessionLogMessage" == *"Backing up"* ]]; then
             SessionLogVMName=$(echo $SessionLogMessage |awk '{print $3}')
             SessionLogVMTransferred=$(echo $SessionLogMessage | awk -F % '{print $2}' | sed 's/[()]//g' | awk -F transferred '{print $1}')
             SessionLogType="Backup"
-            ;;
-            Backup*)
-            SessionLogVMName="N/A"
-            SessionLogVMTransferred="N/A"
-            SessionLogType="Backup Plan"
-            ;;
-            esac
+            
             SessionLogDuration=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionDuration")
             SessionLogDurationB=$(date -d $SessionLogDuration '+%H:%M:%S')
             SessionLogStart=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionStartTime")
@@ -225,6 +214,26 @@ echo "</tr>" >> $html
 			echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogVMTransferred</td>" >> $html
 			echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogDurationB</td>" >> $html
 			echo "</tr>" >> $html
+        elif [[ "$SessionLogMessage" == "Snapshot backup of"* ]]; then
+            SessionLogVMName=$(echo $SessionLogMessage |awk '{print $4}')
+            SessionLogVMTransferred="N/A"
+            SessionLogType="Snapshot"
+            
+            SessionLogDuration=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionDuration")
+            SessionLogDurationB=$(date -d $SessionLogDuration '+%H:%M:%S')
+            SessionLogStart=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionStartTime")
+            SessionLogStartB=$(date -d $SessionLogStart '+%r')
+        	echo '<tr style="height:17px">' >> $html
+			echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogVMName</td>" >> $html
+            echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogType</td>" >> $html
+			echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">" >> $html
+			echo "<span style="color:$bcolor">$SessionLogStatus</span>" >> $html
+			echo "</td>" >> $html
+			echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogStartB</td>" >> $html
+			echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogVMTransferred</td>" >> $html
+			echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogDurationB</td>" >> $html
+			echo "</tr>" >> $html
+        fi
             arraysessionslogbackup=$arraysessionslogbackup+1
             done
 
