@@ -9,8 +9,8 @@
 ##      .Notes
 ##      NAME:  veeam_aws_email_report.sh
 ##      ORIGINAL NAME: veeam_aws_email_report.sh
-##      LASTEDIT: 11/06/2021
-##      VERSION: 1.0
+##      LASTEDIT: 13/04/2022
+##      VERSION: 4.1
 ##      KEYWORDS: Veeam, HTML, Report, AWS
    
 ##      .Link
@@ -44,19 +44,19 @@ fontsize3="22px"
 
 ## Login and Token
 
-veeamBearer=$(curl -X POST --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --header "x-api-version: 1.1-rev0" -d "username=$veeamUsername&password=$veeamPassword&grant_type=password" "$veeamBackupAWSServer:$veeamBackupAWSPort/api/v1/token" -k --silent | jq -r '.access_token')
+veeamBearer=$(curl -X POST --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --header "x-api-version: 1.2-rev0" -d "username=$veeamUsername&password=$veeamPassword&grant_type=password" "$veeamBackupAWSServer:$veeamBackupAWSPort/api/v1/token" -k --silent | jq -r '.access_token')
 
 
 ##
 # Veeam Backup for AWS Overview. This part will check VBA Overview
 ##
 veeamVBAURL="$veeamBackupAWSServer:$veeamBackupAWSPort/api/v1/system/version"
-veeamVBAOverviewUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H -H "x-api-version: 1.1-rev0" "accept: application/json" 2>&1 -k --silent)
+veeamVBAOverviewUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H "x-api-version: 1.2-rev0" "accept: application/json" 2>&1 -k --silent)
 
     version=$(echo "$veeamVBAOverviewUrl" | jq --raw-output ".version" |awk '{$1=$1};1')
     
 veeamVBAURL="$veeamBackupAWSServer:$veeamBackupAWSPort/api/v1/statistics/summary"
-veeamVBAOverviewUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H -H "x-api-version: 1.1-rev0" "accept: application/json" 2>&1 -k --silent)
+veeamVBAOverviewUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H -H "x-api-version: 1.2-rev0" "accept: application/json" 2>&1 -k --silent)
 
     VMsCount=$(echo "$veeamVBAOverviewUrl" | jq --raw-output ".instancesCount")
     VMsProtected=$(echo "$veeamVBAOverviewUrl" | jq --raw-output ".protectedInstancesCount")
@@ -67,21 +67,25 @@ veeamVBAOverviewUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamB
 # Veeam Backup for AWS EC2 Sessions. This part will check VBA Sessions for EC2 Backup Jobs
 ##
 veeamVBAURL="$veeamBackupAWSServer:$veeamBackupAWSPort/api/v1/sessions?Types=Policy&FromUtc=$reportDateFrom&ToUtc=$reportDateTo"
-veeamVBASessionsBackupUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H "x-api-version: 1.1-rev0" -H  "accept: application/json" 2>&1 -k --silent)
+veeamVBASessionsBackupUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H "x-api-version: 1.2-rev0" -H  "accept: application/json" 2>&1 -k --silent)
 
 declare -i arraysessionsbackup=0
 for id in $(echo "$veeamVBASessionsBackupUrl" | jq -r '.results[].id'); do
     SessionID=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].id")
+    SessionPolicyName=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].name")
     SessionStatus=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].result")
     case $SessionStatus in
         Success)
-            bcolor="#37872D"
+            bcolor="#54B948"
         ;;
         Warning)
-            bcolor="#FA6400"
+            bcolor="#F2C973"
         ;;
         Failed)
-            bcolor="#C4162A"
+            bcolor="#E8595A"
+        ;;
+        Error)
+            bcolor="#E8595A"
         ;;
         esac
     SessionExtendedType=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].extendedSessionType")
@@ -106,21 +110,12 @@ for id in $(echo "$veeamVBASessionsBackupUrl" | jq -r '.results[].id'); do
     SessionStartTimeB=$(date -d $SessionStartTime '+%r')
     SessionStopTime=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].executionStopTime")
     SessionStopTimeB=$(date -d $SessionStopTime '+%r')
-    SessionPolicyID=$(echo "$veeamVBASessionsBackupUrl" | jq --raw-output ".results[$arraysessionsbackup].id")
-    
-    ##
-    # Workaround for Policy Name
-    #
-    veeamBearerInt=$(curl -X POST --header "Content-Type: application/x-www-form-urlencoded" --header "Accept: application/json" --header "x-api-version: 1.0-rev3" -d "username=$veeamUsername&password=$veeamPassword&grant_type=password" "$veeamBackupAWSServer/api/oauth2/token" -k --silent | jq -r '.access_token')
-    veeamVBAURL="$veeamBackupAWSServer/api/v1/sessions/$SessionID"
-    veeamVBASessionName=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearerInt" -H "x-api-version: 1.0-rev3" -H  "accept: application/json" 2>&1 -k --silent)
-    SessionPolicyName=$(echo "$veeamVBASessionName" | jq --raw-output ".name")
-    
+ 
     ##
     # Veeam Backup for AWS Detailed Sessions. This part will check the Instances inside the Session
     ##
     veeamVBAURL="$veeamBackupAWSServer:$veeamBackupAWSPort/api/v1/sessions/$SessionID/log"
-    veeamVBASessionsLogBackupUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H "x-api-version: 1.1-rev0" -H  "accept: application/json" 2>&1 -k --silent)
+    veeamVBASessionsLogBackupUrl=$(curl -X GET $veeamVBAURL -H "Authorization: Bearer $veeamBearer" -H "x-api-version: 1.2-rev0" -H  "accept: application/json" 2>&1 -k --silent)
 
 
 #Generating HTML file
@@ -145,7 +140,7 @@ echo '<td colspan="6" style="border:none; padding:0px; font-family:Tahoma; font-
 echo '<table class="x_inner" style="margin:0px; border-collapse:collapse" width="100%" cellspacing="0" cellpadding="0" border="0">' >> $html
 echo "<tbody>" >> $html
 echo '<tr style="height:17px">' >> $html
-echo "<td colspan='6' class='_sessionDetails' style='border-style:solid; border-color:$color1; border-width:1px 1px 0 1px; height:35px; background-color:$color2; font-size:$fontsize3; vertical-align:middle; padding:5px 0 0 15px; color:$color3; font-family:Tahoma'>" >> $html
+echo "<td colspan='6' class='_sessionDetails' style='border-style:solid; border-color:$color1; border-width:1px 1px 0 2px; height:35px; background-color:$color2; font-size:$fontsize3; vertical-align:middle; padding:5px 0 0 15px; color:$color3; font-family:Tahoma'>" >> $html
 echo "<span>$reportDate</span>" >> $html
 echo "</td>" >> $html
 echo "</tr>" >> $html
@@ -201,16 +196,16 @@ echo "</tr>" >> $html
         SessionLogStatus=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].status")
         case $SessionLogStatus in
             Success)
-                bcolor="#37872D"
+                bcolor="#54B948"
             ;;
             Warning)
-                bcolor="#FA6400"
+                bcolor="#F2C973"
             ;;
             Failed)
-                bcolor="#C4162A"
+                bcolor="#E8595A"
             ;;
             Error)
-                bcolor="#C4162A"
+                bcolor="#E8595A"
             ;;
         esac
         
@@ -268,7 +263,34 @@ echo "</tr>" >> $html
                         echo "</tr>" >> $html
                 ;;
                 esac
-            ;;  
+            ;;
+            PolicyRemoteSnapshot)
+                SessionLogMessage=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].message")
+                case $SessionLogMessage in
+                Processing*)
+                    SessionLogWorkloadName=$(echo $SessionLogMessage |awk '{print $2}' | sed 's/.$//')
+                    SessionLogWorkloadTransferred="N/A"
+                    SessionLogWorkloadType="EC2 Replica Snapshot"
+                    SessionLogStartTime=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionStartTime")
+                    SessionLogStoptTime=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].logTime")
+                    SessionLogDurationS=$(echo $(( $(date -d "$SessionLogStoptTime" "+%s") - $(date -d "$SessionLogStartTime" "+%s") )))
+                    SessionLogDurationB=$(echo $(($(($SessionLogDurationS - $SessionLogDurationS/86400*86400))/3600))h:$(($(($SessionLogDurationS - $SessionLogDurationS/86400*86400))%3600/60))m:$(($(($SessionLogDurationS - $SessionLogDurationS/86400*86400))%60))s)
+                    SessionLogStart=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionStartTime")
+                    SessionLogStartB=$(date -d $SessionLogStart '+%r')
+
+                        echo '<tr style="height:17px">' >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogWorkloadName</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogWorkloadType</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">" >> $html
+                        echo "<span style="color:$bcolor">$SessionLogStatus</span>" >> $html
+                        echo "</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogStartB</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogWorkloadTransferred</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogDurationB</td>" >> $html
+                        echo "</tr>" >> $html
+                ;;
+                esac
+            ;;   
             VpcBackup)
                 SessionLogMessage=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].message")
                 case $SessionLogMessage in
@@ -322,6 +344,60 @@ echo "</tr>" >> $html
                 ;;
                 esac 
             ;;
+            PolicyEfsBackup)
+                SessionLogMessage=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].message")
+                case $SessionLogMessage in
+                Processing*)
+                    SessionLogWorkloadName=$(echo $SessionLogMessage |awk '{print $2}' | sed 's/.$//')
+                    SessionLogWorkloadTransferred="N/A"
+                    SessionLogWorkloadType="EFS Backup"
+                    SessionLogStartTime=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionStartTime")
+                    SessionLogStoptTime=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].logTime")
+                    SessionLogDurationS=$(echo $(( $(date -d "$SessionLogStoptTime" "+%s") - $(date -d "$SessionLogStartTime" "+%s") )))
+                    SessionLogDurationB=$(echo $(($(($SessionLogDurationS - $SessionLogDurationS/86400*86400))/3600))h:$(($(($SessionLogDurationS  -$SessionLogDurationS/86400*86400))%3600/60))m:$(($(($SessionLogDurationS - $SessionLogDurationS/86400*86400))%60))s)
+                    SessionLogStart=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionStartTime")
+                    SessionLogStartB=$(date -d $SessionLogStart '+%r')
+                    
+                        echo '<tr style="height:17px">' >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">EFS Workloads</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogWorkloadType</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">" >> $html
+                        echo "<span style="color:$bcolor">$SessionLogStatus</span>" >> $html
+                        echo "</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogStartB</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogWorkloadTransferred</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogDurationB</td>" >> $html
+                        echo "</tr>" >> $html
+                ;;
+                esac
+            ;;
+            PolicyEfsBackupCopy)
+                SessionLogMessage=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].message")
+                case $SessionLogMessage in
+                Processing*)
+                    SessionLogWorkloadName=$(echo $SessionLogMessage |awk '{print $2}' | sed 's/.$//')
+                    SessionLogWorkloadTransferred="N/A"
+                    SessionLogWorkloadType="EFS Backup Copy"
+                    SessionLogStartTime=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionStartTime")
+                    SessionLogStoptTime=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].logTime")
+                    SessionLogDurationS=$(echo $(( $(date -d "$SessionLogStoptTime" "+%s") - $(date -d "$SessionLogStartTime" "+%s") )))
+                    SessionLogDurationB=$(echo $(($(($SessionLogDurationS - $SessionLogDurationS/86400*86400))/3600))h:$(($(($SessionLogDurationS  -$SessionLogDurationS/86400*86400))%3600/60))m:$(($(($SessionLogDurationS - $SessionLogDurationS/86400*86400))%60))s)
+                    SessionLogStart=$(echo "$veeamVBASessionsLogBackupUrl" | jq --raw-output ".log[$arraysessionslogbackup].executionStartTime")
+                    SessionLogStartB=$(date -d $SessionLogStart '+%r')
+                    
+                        echo '<tr style="height:17px">' >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">EFS Workloads</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogWorkloadType</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">" >> $html
+                        echo "<span style="color:$bcolor">$SessionLogStatus</span>" >> $html
+                        echo "</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogStartB</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogWorkloadTransferred</td>" >> $html
+                        echo "<td style='padding:2px 3px 2px 3px; vertical-align:top; border:1px solid $color1; font-family:Tahoma; font-size:$fontsize1' nowrap="">$SessionLogDurationB</td>" >> $html
+                        echo "</tr>" >> $html
+                ;;
+                esac
+            ;;
         esac
         
             arraysessionslogbackup=$arraysessionslogbackup+1
@@ -334,9 +410,6 @@ echo "</tr>" >> $html
 echo "<tr>" >> $html
 echo "<td>&nbsp;</td>" >> $html
 echo "</tr>" >> $html
-echo "<tr>" >> $html
-echo "<td style='font-size:$fontsize2; color:$color3; padding:2px 3px 2px 3px; vertical-align:top; font-family:Tahoma'>Veeam Backup for AWS - Hostname: $veeamBackupAWSServer Version: $version</td>" >> $html
-echo "</tr>" >> $html
 echo "</tbody>" >> $html
 echo "</table>" >> $html
 echo "<br/>" >> $html
@@ -344,7 +417,7 @@ echo "<br/>" >> $html
 
     arraysessionsbackup=$arraysessionsbackup+1
 done
+echo "<div style='font-size:$fontsize2; color:$color3; padding:2px 3px 2px 3px; vertical-align:top; font-family:Tahoma'>Veeam Backup for AWS - Hostname: $veeamBackupAWSServer Version: $version</div>" >> $html
 
 #Sending Email to the user
 cat $html | s-nail -M "text/html" -s "$veeamBackupAWSServer - Daily Veeam Backup for AWS Report" $email_add
-
