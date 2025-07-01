@@ -22,7 +22,7 @@
 
 .NOTES
     NAME: Veeam_Backup_Azure_WorkloadProtectionHistory.ps1
-    VERSION: 1.0
+    VERSION: 1.1
     AUTHOR: Jorge de la Cruz
     TWITTER: @jorgedlcruz
     GITHUB: https://github.com/jorgedlcruz
@@ -210,6 +210,7 @@ $rowsHtml = $policySessionObjects | ForEach-Object {
     $resultStyle = switch ($_.Result) {
         "Success" { 'class="success"' }
         "Failed"  { 'class="failed"' }
+        "Error"  { 'class="failed"' }
         "Warning" { 'class="warning"' }
         Default   { '' }
     }
