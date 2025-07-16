@@ -1,4 +1,4 @@
-# Veeam Backup for Azure – Daily Sessions Report
+# Veeam Backup for Azure – Job History Report
 
 ![alt tag](https://jorgedelacruz.uk/wp-content/uploads/2025/07/vb-azure-job-history-html-001.png)
 
