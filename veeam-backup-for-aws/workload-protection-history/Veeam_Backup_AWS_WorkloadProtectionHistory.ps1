@@ -50,11 +50,11 @@ $veeamUsername = "YOURUSER"
 $veeamPassword = "YOURPASS"
 $veeamBackupAWSServer = "https://YOURVBIP"
 $veeamBackupAWSPort = "11005"
-$apiVersion = "1.7-rev0" # keep aligned with appliance More information here https://helpcenter.veeam.com/references/vbaws/9/rest/1.7-rev0/tag/SectionOverview#section/Versioning
+$apiVersion = "1.7-rev0" # keep aligned with appliance. More information here https://helpcenter.veeam.com/references/vbaws/9/rest/1.7-rev0/tag/SectionOverview#section/Versioning
 $apiUrl = "$veeamBackupAWSServer`:$veeamBackupAWSPort/api/v1"
 
 # Scope & time window
-$vmNames = @('dkarev-protected-instance-3')
+$vmNames = @('VM-NAME1,VM-NAME2')
 $startDate   = '2025-08-31T00:00:01'
 $endDate     = '2025-09-01T23:59:59'
 $periodStart = (Get-Date $startDate).ToString('yyyy-MM-dd')
