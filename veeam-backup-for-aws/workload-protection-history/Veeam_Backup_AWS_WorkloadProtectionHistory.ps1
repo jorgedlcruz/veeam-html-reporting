@@ -20,7 +20,7 @@
 
 .NOTES
     NAME: Veeam_Backup_AWS_WorkloadProtectionHistory.ps1
-    VERSION: 1.1
+    VERSION: 9.0
     AUTHOR: Jorge de la Cruz
     TWITTER: @jorgedlcruz
     GITHUB: https://github.com/jorgedlcruz
@@ -50,11 +50,15 @@ $veeamUsername = "YOURUSER"
 $veeamPassword = "YOURPASS"
 $veeamBackupAWSServer = "https://YOURVBIP"
 $veeamBackupAWSPort = "11005"
-$apiVersion = "1.4-rev0" # Make sure you use the API version according to your appliance https://helpcenter.veeam.com/docs/vbaws/rest/versioning.html?ver=70
+$apiVersion = "1.7-rev0" # keep aligned with appliance More information here https://helpcenter.veeam.com/references/vbaws/9/rest/1.7-rev0/tag/SectionOverview#section/Versioning
 $apiUrl = "$veeamBackupAWSServer`:$veeamBackupAWSPort/api/v1"
-$vmNames = @('MYVMANEM1','MYVMNAME2')
-$startDate = '2024-01-01T00:00:01'
-$endDate = '2024-02-21T23:59:59'
+
+# Scope & time window
+$vmNames = @('dkarev-protected-instance-3')
+$startDate   = '2025-08-31T00:00:01'
+$endDate     = '2025-09-01T23:59:59'
+$periodStart = (Get-Date $startDate).ToString('yyyy-MM-dd')
+$periodEnd   = (Get-Date $endDate).ToString('yyyy-MM-dd')
 
 # Function to get API token - Public API
 Function Get-ApiToken {
@@ -150,53 +154,107 @@ Function Get-PoliciesByVMId {
 }
 
 
-# Function to get policies sessions by Policy Id and VM ID
+# Function to get policy sessions by Policy Id and VM ID
 Function Get-PolicyInstanceSessions {
     Param (
         [string]$policyId,
         [string]$vmId
     )
+
     Write-Host "Retrieving policy instance sessions for Policy ID: $policyId and VM ID: $vmId..."
 
     $headers = @{
         "Authorization" = "Bearer $newToken"
-        "Content-Type" = "application/json"
+        "Accept"        = "application/json"
+        "Content-Type"  = "application/json"
+        "x-api-version" = "1.0-rev10"
     }
-    
-    $body = @{
-        "skip" = 0
-        "count" = 200
-        "orderAsc" = $false
-        "orderColumn" = 'startTimeUtc'
-        "policyId" = $policyId
-        "instanceId" = $vmId
-        "filters" = @{
-            "timePeriod" = ''
-            "statuses" = @()
-            "sessionTypes" = @()
-        }
-    } | ConvertTo-Json
-    
-    try {
-        $response = Invoke-RestMethod -Uri "$veeamBackupAWSServer/api/v1/reports/policyInstanceSessions" -Method "POST" -Headers $headers -ContentType "application/json" -Body $body
-        $filteredSessions = @()
-        foreach ($session in $response.data) {
-            $sessionStopTimeStr = $session.stopTime -split '\.' | Select-Object -First 1
-            $sessionStopTime = [datetime]::ParseExact($sessionStopTimeStr, 'yyyy-MM-ddTHH:mm:ss', $null)
-            if ($sessionStopTime -ge $startDate -and $sessionStopTime -le $endDate) {
-                $filteredSessions += $session
+
+    function Invoke-ClassicReport {
+        param([string]$OrderColumnOrEmpty)
+
+        $bodyObj = @{
+            skip       = 0
+            count      = 200
+            orderAsc   = $false
+            policyId   = $policyId
+            instanceId = $vmId
+            filters    = @{
+                timePeriod   = ''
+                statuses     = @()
+                sessionTypes = @()
             }
         }
-        Write-Host "Filtered policy instance sessions retrieved successfully."
-        return $filteredSessions
-    } catch {
-        Write-Host "Error retrieving policy instance sessions: $($_.Exception.Message)"
-        return @()
+
+        if ($OrderColumnOrEmpty) {
+            $bodyObj.orderColumn = $OrderColumnOrEmpty
+        }
+
+        $bodyJson = $bodyObj | ConvertTo-Json -Depth 6
+
+        return Invoke-RestMethod `
+            -Uri "$veeamBackupAWSServer/api/v1/reports/policyInstanceSessions" `
+            -Method POST `
+            -Headers $headers `
+            -Body $bodyJson `
+            -ContentType "application/json"
     }
+
+    try {
+        $response = Invoke-ClassicReport -OrderColumnOrEmpty 'StartTime'
+    } catch {
+        $status = $null; $detail = $null
+        if ($_.Exception.Response) {
+            $status = $_.Exception.Response.StatusCode.value__
+            try { $sr = New-Object IO.StreamReader($_.Exception.Response.GetResponseStream()); $detail = $sr.ReadToEnd() } catch {}
+        }
+        if ($status -eq 400) {
+            Write-Host "Server rejected orderColumn=StartTime (400). Retrying with StartTimeUtc..."
+            try {
+                $response = Invoke-ClassicReport -OrderColumnOrEmpty 'StartTimeUtc'
+            } catch {
+                $status2 = $null; $detail2 = $null
+                if ($_.Exception.Response) {
+                    $status2 = $_.Exception.Response.StatusCode.value__
+                    try { $sr2 = New-Object IO.StreamReader($_.Exception.Response.GetResponseStream()); $detail2 = $sr2.ReadToEnd() } catch {}
+                }
+                if ($status2 -eq 400) {
+                    Write-Host "Server rejected orderColumn=StartTimeUtc (400). Retrying with NO orderColumn..."
+                    try {
+                        $response = Invoke-ClassicReport -OrderColumnOrEmpty $null
+                    } catch {
+                        $status3 = $null; $detail3 = $null
+                        if ($_.Exception.Response) {
+                            $status3 = $_.Exception.Response.StatusCode.value__
+                            try { $sr3 = New-Object IO.StreamReader($_.Exception.Response.GetResponseStream()); $detail3 = $sr3.ReadToEnd() } catch {}
+                        }
+                        Write-Host "Error retrieving policy instance sessions (HTTP $status3): $detail3"
+                        return @()
+                    }
+                } else {
+                    Write-Host "Error retrieving policy instance sessions (HTTP $status2): $detail2"
+                    return @()
+                }
+            }
+        } else {
+            Write-Host "Error retrieving policy instance sessions (HTTP $status): $detail"
+            return @()
+        }
+    }
+
+    $filteredSessions = @()
+    foreach ($session in $response.data) {
+        $sessionStopTimeStr = $session.stopTime -split '\.' | Select-Object -First 1
+        $sessionStopTime    = [datetime]::ParseExact($sessionStopTimeStr, 'yyyy-MM-ddTHH:mm:ss', $null)
+        if ($sessionStopTime -ge $startDate -and $sessionStopTime -le $endDate) {
+            $filteredSessions += $session
+        }
+    }
+
+    Write-Host "Filtered policy instance sessions retrieved successfully."
+    return $filteredSessions
 }
 
-
-# Initialize an empty array for all unique policy session objects
 $policySessionObjects = @()
 
 # Main script execution part
@@ -291,8 +349,6 @@ $rowsHtml = $policySessionObjects | ForEach-Object {
     $rowHtml
 }
 
-
-
 # Building the Output
 $currentDate = Get-Date -Format "yyyy-MM-dd"
 
@@ -318,4 +374,3 @@ Write-Host "CSV report saved to $csvFilePath"
 } else {
     Write-Host "No policy session information was found for any VMs."
 }
-
