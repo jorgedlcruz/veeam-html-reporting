@@ -1,25 +1,69 @@
-HTML Report for Veeam Backup for AWS
-===================
+# HTML Report for Veeam Backup for AWS
 
-![alt tag](https://www.jorgedelacruz.es/wp-content/uploads/2021/06/veeam-html-aws-001.jpg)
+![Report screenshot](https://jorgedelacruz.uk/wp-content/uploads/2025/09/veeam-html-aws-9-001.jpg)
 
-This Script will query the Veeam Backup for AWS  API and save the job sessions stats for the last 24 hours. Then it saves it into a comfortable HTML, and it is sent over EMAIL
-The Script it is provided as it is, and bear in mind you can not open support Tickets regarding this project. It is a Community Project, and it does use some internal API Calls as well as a workaround
+This script queries the Veeam Backup for AWS REST API for recent job sessions and builds a clean HTML report (then emails it).  
+It’s a community project, provided **as-is**.
 
-We use Veeam Backup for Microsoft AWS v3.0 RESTfulAPI to reduce the workload and increase the speed of script execution. 
+---
 
-----------
+## What’s new (compared to the original script)
 
-### Getting started
-You can follow the steps on the next Blog Post - [https://jorgedelacruz.uk/2021/06/11/veeam-detailed-html-daily-report-for-veeam-backup-for-aws-is-now-available-community-project/](https://jorgedelacruz.uk/2021/06/11/veeam-detailed-html-daily-report-for-veeam-backup-for-aws-is-now-available-community-project/)
+- **SLA Policies support**
+  - Handles modern/extended session types:
+    - `PolicyBackup`, `PolicySnapshot`, `PolicyRemoteSnapshot`
+    - `PolicyRdsSnapshot`
+    - `PolicyEfsBackup`, `PolicyEfsBackupCopy`
+    - `VpcBackup`
 
-Or try with this simple steps:
-* Download the veeam_aws_email_report.sh file and change the parameters under Configuration, like username/password, etc. with your real data
-* Make the script executable with the command chmod +x veeam_aws_email_report.sh
-* Run the veeam_aws_email_report.sh and check under the folder you defined, that you have your HTML Report
-* Schedule the script execution, for example every day at 00:05 using crontab
-* You will need mailutils on your server in order to send Emails - And most likely have a proper SmartHost to rely your email
-* Enjoy :)
+- **Stronger warning/error surfacing**
+  - If a session has warnings/errors but **no per-workload “Processing …” lines**, we print a **single summary row** with:
+    - worst status, representative message, time, and duration.
+  - Explicit handling for:
+    - **“The resource is already protected by another policy: <name>”** → shown as a row with the workload name and job type marked **“(skipped)”**.
+    - **“There are no resources to process”** → shown as a clear one-liner.
+
+- **Extended Session Types filter (client-side)**
+  - New variable `filterExtendedTypes` accepts a **comma-separated list** (turned into a regex) to limit which sessions render.
+    - Examples:
+      - `filterExtendedTypes="PolicyBackup,PolicySnapshot"`
+      - `filterExtendedTypes="VpcBackup"`
+      - `filterExtendedTypes=""` (show all)
+  - Console prints a quick breakdown per type for sanity checking.
+
+- **Better parsing & HTML fixes**
+  - EC2 backups: extract workload name and **transferred size** from  
+    `… processing <name> - 100%, <size> transferred.` lines.
+  - Snapshots/EFS/replica snapshots: consistent, clean workload names from “Processing …”.
+  - VPC backups: simplified/robust “Performing …” parsing.
+  - Consistent color coding for `Success` / `Warning` / `Failed|Error`.
+  - Fixed HTML quoting so `$fontsize*` variables actually render (no stray literal `$fontsize2`).
+  - Header shows the **active extendedSessionType filter**.
+
+- **API/stability improvements**
+  - Uses `statistics/summary` (not `system/version`) for counts.
+  - Safer bearer-token check and clearer log messages.
+  - Ensures report folder exists; cleaner console output.
+
+---
+
+## Getting started
+
+**Full guide:**  
+<https://jorgedelacruz.uk/2021/06/11/veeam-detailed-html-daily-report-for-veeam-backup-for-aws-is-now-available-community-project/>
+
+**Quick steps:**
+
+1. Download `veeam_aws_email_report.sh` and update the **Configurations** section (server, port, API version, credentials, email).
+2. Optionally set a filter, for example:
+   ```bash
+   filterExtendedTypes="PolicyBackup,PolicySnapshot"
+   ```
+3. Make the script executable with the command chmod +x veeam_aws_email_report.sh
+4. Run the veeam_aws_email_report.sh and check under the folder you defined, that you have your HTML Report
+5. Schedule the script execution, for example every day at 00:05 using crontab
+6. You will need mailutils on your server in order to send Emails - And most likely have a proper SmartHost to rely your email
+7. Enjoy :)
 
 **Extra**
 You will need an extra package to be able to send secure emails, that will always land without problems:
@@ -31,25 +75,37 @@ This will allow us to use a better, and modern, way of sending emails. Now with 
 ``vi ~/.mailrc``
 
 Inside the file, which might be empty first time you open it, introduce the next:
-
-``set smtp-use-starttls``
-
-``set ssl-verify=ignore``
-
-``set smtp=smtp://YOURSMTPSERVER:587``
-
-``set smtp-auth=login``
-
-``set smtp-auth-user="YOURUSER@YOURDOMAIN.COM"``
-
-``set smtp-auth-password="YOURPASSWORD"``
-
-``set from="YOURFROMEMAIL@YOURDOMAIN.COM"``
-
+   ```bash
+   set smtp-use-starttls
+   set ssl-verify=ignore
+   set smtp=smtp://YOURSMTPSERVER:587
+   set smtp-auth=login
+   set smtp-auth-user="YOURUSER@YOURDOMAIN.COM"
+   set smtp-auth-password="YOURPASSWORD"
+   set from="YOURFROMEMAIL@YOURDOMAIN.COM"
+   ```
 ----------
 
-### Additional Information
-* Having in mind to add much more information into the report, share your ideas, please.
+## Output behavior (quick reference)
 
-### Known issues 
-Emails issues are the most common ones, just make sure you are using a valid SmartHost to rely your emails.
+- Per-workload rows for EC2 backups, snapshots, EFS, replicas, VPC (when log lines include "Processing ..." / "Performing ...").
+- One-liner fallback when there are warnings/errors but no per-workload details.
+- Special cases:
+  - Already protected elsewhere → <workload> with **(skipped)** job type.
+  - No resources to process → single descriptive row.
+- Colors: green = Success, amber = Warning, red = Failed/Error, gray = other.
+
+## Known issues
+
+- Most problems are mail relay related—use a valid smarthost and confirm credentials/ports.
+- Keep `apiVersion` aligned with your appliance; REST versions can change between releases.
+
+## Tip: sanity check your filter
+
+The script prints a per-type count, e.g.:
+
+[INFO]  PolicyBackup: 8  
+[INFO]  PolicySnapshot: 6
+
+If it’s empty, clear or adjust `filterExtendedTypes` (set to `""` to show everything).
+
