@@ -54,8 +54,10 @@ $apiVersion = "1.7-rev0" # keep aligned with appliance. More information here ht
 $apiUrl = "$veeamBackupAWSServer`:$veeamBackupAWSPort/api/v1"
 
 # Scope & time window
-$vmNames = @('VM-NAME1,VM-NAME2')
-$startDate   = '2025-08-31T00:00:01'
+$vmNames = @('VM-NAME-1','VM-NAME-2')
+$vmOrderMap = @{}
+for ($i = 0; $i -lt $vmNames.Count; $i++) { $vmOrderMap[$vmNames[$i]] = $i }
+$startDate   = '2025-07-31T00:00:01'
 $endDate     = '2025-09-01T23:59:59'
 $periodStart = (Get-Date $startDate).ToString('yyyy-MM-dd')
 $periodEnd   = (Get-Date $endDate).ToString('yyyy-MM-dd')
@@ -126,26 +128,32 @@ Function Get-VMIds {
 # Function to get policies by VM ID
 Function Get-PoliciesByVMId {
     Param (
-        [string]$vmId
+        [string]$vmId,
+        [string]$vmName = $null  # optional, for logging only
     )
     Write-Host "Retrieving policies for VM ID: $vmId..."
     $headers = @{
         'Authorization' = "Bearer $token"
         'x-api-version' = $apiVersion
+        'Accept'        = 'application/json'
     }
-    $policies = @()  # Initialize an empty array to store policy objects
+    $policies = @()
     try {
-        $response = Invoke-RestMethod -Uri "$apiUrl/virtualMachines/policies?VirtualMachineId=$vmId" -Headers $headers
-        if ($response.totalCount -gt 0) {
+        $response = Invoke-RestMethod -Uri "$apiUrl/virtualMachines/policies?VirtualMachineId=$vmId" -Headers $headers -ErrorAction Stop
+        $tc = [int]($response.totalCount)
+        if ($tc -gt 0) {
             foreach ($policy in $response.results) {
-                $policyObj = [PSCustomObject]@{
-                    'ID' = $policy.id
+                $policies += [PSCustomObject]@{
+                    'ID'   = $policy.id
                     'Name' = $policy.name
                 }
-                $policies += $policyObj
             }
         } else {
-            Write-Host "No policies found for VM ID: $vmId"
+            if ([string]::IsNullOrWhiteSpace($vmName)) {
+                Write-Host "VM (ID: $vmId) returns 0 classic policies → likely SLA."
+            } else {
+                Write-Host "VM '$vmName' (ID: $vmId) returns 0 classic policies → likely SLA."
+            }
         }
     } catch {
         Write-Host "Error retrieving policies for VM ID: $vmId - $($_.Exception.Message)"
@@ -153,8 +161,159 @@ Function Get-PoliciesByVMId {
     return $policies
 }
 
+# Function to get classic policies by VM ID
+Function Find-ClassicPolicyIdByNameAndVm {
+    Param(
+        [Parameter(Mandatory)] [string]$PolicyName,
+        [Parameter(Mandatory)] [string]$VmId
+    )
+    $headers = @{
+        'Authorization' = "Bearer $token"
+        'x-api-version' = $apiVersion
+        'Accept'        = 'application/json'
+    }
+    $q = [System.Uri]::EscapeDataString($PolicyName)
+    try {
+        $resp = Invoke-RestMethod -Uri "$apiUrl/virtualMachines/policies?SearchPattern=$q" -Headers $headers -ErrorAction Stop
+        foreach ($p in $resp.results) {
+            if ($p.selectedItems -and $p.selectedItems.virtualMachineIds -and ($p.selectedItems.virtualMachineIds -contains $VmId)) {
+                return [PSCustomObject]@{ Id = $p.id; Name = $p.name }
+            }
+        }
+    } catch {
+        Write-Host "Classic fallback lookup failed for '$PolicyName' -> $($_.Exception.Message)"
+    }
+    return $null
+}
 
-# Function to get policy sessions by Policy Id and VM ID
+# Cache to avoid repeated calls
+$global:SlaInstancesCache = $null
+$global:SlaPoliciesCache  = @{
+    'Daily'   = $null
+    'Weekly'  = $null
+    'Monthly' = $null
+}
+
+# Function to get all VMs
+Function Get-InstancesReport {
+    $headers = @{
+        "Authorization" = "Bearer $newToken"
+        "Accept"        = "application/json"
+        "Content-Type"  = "application/json"
+        "x-api-version" = "1.0-rev10"
+    }
+    $body = @{ skip = 0; count = 500; orderAsc = $true; orderColumn = "instanceName"; typeFilter = @() } | ConvertTo-Json
+    Invoke-RestMethod -Uri "$veeamBackupAWSServer/api/v1/reports/instances" -Method POST -Headers $headers -Body $body
+}
+
+# Function to get all SLA Policies
+Function Get-ProtectionPolicies {
+    Param([ValidateSet('Daily','Weekly','Monthly')] [string]$ScheduleType)
+    if ($global:SlaPoliciesCache[$ScheduleType]) { return $global:SlaPoliciesCache[$ScheduleType] }
+
+    $headers = @{
+        "Authorization" = "Bearer $newToken"
+        "Accept"        = "application/json"
+        "Content-Type"  = "application/json"
+        "x-api-version" = "1.0-rev10"
+    }
+    $body = @{
+        skip = 0; count = 500; orderAsc = $true; orderColumn = 'Priority'
+        filters = @{}
+        slaReportingSettings = @{ scheduleType = $ScheduleType }
+    } | ConvertTo-Json -Depth 6
+
+    $resp = Invoke-RestMethod -Uri "$veeamBackupAWSServer/api/v1/reports/protectionPolicies" -Method POST -Headers $headers -Body $body
+    $global:SlaPoliciesCache[$ScheduleType] = $resp.data
+    return $global:SlaPoliciesCache[$ScheduleType]
+}
+
+# Function to get SLA Policy Destination
+Function Get-SlaBackupTypesFromDestination {
+    Param([string]$PolicyDestination)
+    $types = @()
+    if ($PolicyDestination -match 'Snapshot') { $types += 'Ec2Snapshot' }
+    if ($PolicyDestination -match 'Regular')  { $types += 'Ec2Backup'   }
+    if ($types.Count -eq 0) { $types = @('Ec2Snapshot') }
+    $types | Select-Object -Unique
+}
+
+# Function to get SLA Policy per VM ID
+Function Resolve-SlaPolicyForInstanceId {
+    Param([string]$VmId, [string]$VmName = $null)
+
+    if (-not $global:SlaInstancesCache) {
+        try   { $global:SlaInstancesCache = Get-InstancesReport }
+        catch { Write-Host "SLA: failed to fetch /reports/instances -> $($_.Exception.Message)"; return $null }
+    }
+
+    $row = $global:SlaInstancesCache.data | Where-Object { $_.instanceId -eq $VmId } | Select-Object -First 1
+    if (-not $row) {
+        Write-Host "SLA: could not locate instanceId $VmId in /reports/instances."
+        return $null
+    }
+
+    $policyId   = $row.policyId
+    $policyName = $row.policyName
+    $dest       = $row.policyDestination
+
+    if ($policyId) {
+        return [PSCustomObject]@{ Id = $policyId; Name = $policyName; Destination = $dest; Source = 'SLA' }
+    }
+
+    if ($policyName) {
+        # Try map by name across schedules
+        foreach ($sch in @('Daily','Weekly','Monthly')) {
+            $pols = Get-ProtectionPolicies -ScheduleType $sch
+            $hit  = $pols | Where-Object { $_.name -eq $policyName } | Select-Object -First 1
+            if ($hit) {
+                return [PSCustomObject]@{ Id = $hit.id; Name = $hit.name; Destination = $dest; Source = 'SLA' }
+            }
+        }
+        # Could be a classic policy that the instances report still shows by name
+        Write-Host "SLA: could not resolve SLA policyId for policyName '$policyName' (instance $VmId). Will attempt classic fallback by name."
+        return [PSCustomObject]@{ Id = $null; Name = $policyName; Destination = $dest; Source = 'Unknown' }
+    }
+
+    Write-Host "SLA: instance has no policyName in /reports/instances."
+    return $null
+}
+
+# Function to get SLA sessions per VM ID
+Function Get-SlaPolicyInstanceSessions {
+    Param(
+        [string]$PolicyId,
+        [string]$ResourceId,    # instanceId
+        [ValidateSet('Ec2Snapshot','Ec2Backup')] [string]$BackupType = 'Ec2Snapshot',
+        [ValidateSet('Daily','Weekly','Monthly')] [string]$ScheduleType = 'Daily',
+        [string]$PeriodStart,   # yyyy-MM-dd
+        [string]$PeriodEnd      # yyyy-MM-dd
+    )
+
+    $headers = @{
+        "Authorization" = "Bearer $newToken"
+        "Accept"        = "application/json"
+        "Content-Type"  = "application/json"
+        "x-api-version" = "1.0-rev10"
+    }
+
+    $body = @{
+        policyId     = $PolicyId
+        resourceId   = $ResourceId
+        periodStart  = $PeriodStart
+        periodEnd    = $PeriodEnd
+        backupType   = $BackupType
+        scheduleType = $ScheduleType
+        skip         = 0
+        count        = 200
+        orderAsc     = $false
+        orderColumn  = 'startTime'
+    } | ConvertTo-Json -Depth 6
+
+    Invoke-RestMethod -Uri "$veeamBackupAWSServer/api/v1/reports/protectionPolicyInstanceSessions" -Method POST -Headers $headers -Body $body
+}
+
+# Function to get classic policy sessions by Policy ID and VM ID 
 Function Get-PolicyInstanceSessions {
     Param (
         [string]$policyId,
@@ -255,42 +414,142 @@ Function Get-PolicyInstanceSessions {
     return $filteredSessions
 }
 
-$policySessionObjects = @()
+$classicObjs = @()
+$slaObjs     = @()
 
-# Main script execution part
 foreach ($vmName in $vmNames) {
     Write-Host "Processing VM: $vmName"
     $vmIds = Get-VMIds -vmName $vmName
     foreach ($vmId in $vmIds) {
-        Write-Host "Retrieving policies for VM ID: $vmId..."
-        $policies = Get-PoliciesByVMId -vmId $vmId
-        foreach ($policy in $policies) {
-            $policyId = $policy.ID
-            $policyName = $policy.Name
-            Write-Host "Retrieving sessions for Policy: '$policyName' (ID: $policyId) and VM ID: $vmId..."
-            $sessions = Get-PolicyInstanceSessions -policyId $policyId -vmId $vmId
-            foreach ($session in $sessions) {
-                $sessionObj = [PSCustomObject]@{
-                    'VM Name'       = $vmName
-                    'Policy ID'     = $policyId
-                    'Policy Name'   = $policyName
-                    'Session Type'  = $session.sessionType
-                    'Result'        = $session.result
-                    'Session ID'    = $session.sessionId
-                    'Start Time'    = $session.startTime
-                    'Stop Time'     = $session.stopTime
-                    'Duration (s)'  = $session.duration
+
+        $policies = Get-PoliciesByVMId -vmId $vmId -vmName $vmName
+        if ($policies -and $policies.Count -gt 0) {
+            foreach ($policy in $policies) {
+                $policyId   = $policy.ID
+                $policyName = $policy.Name
+                Write-Host "Classic: sessions for '$policyName' ($policyId) VM $vmId"
+                $sessions = Get-PolicyInstanceSessions -policyId $policyId -vmId $vmId
+                foreach ($session in $sessions) {
+                    $classicObjs += [PSCustomObject]@{
+                        'VM Order'     = $vmOrderMap[$vmName]
+                        'Start Sort'   = ([datetime]$session.startTime)
+                        'VM Name'      = $vmName
+                        'Policy ID'    = $policyId
+                        'Policy Name'  = $policyName
+                        'Session Type' = $session.sessionType
+                        'Result'       = $session.result
+                        'Session ID'   = $session.sessionId
+                        'Start Time'   = $session.startTime
+                        'Stop Time'    = $session.stopTime
+                        'Duration (s)' = $session.duration
+                        'Source'       = 'Classic'
+                    }
                 }
-                $policySessionObjects += $sessionObj
+            }
+            continue
+        }
+
+        $slaPolicy = Resolve-SlaPolicyForInstanceId -VmId $vmId -VmName $vmName
+        if (-not $slaPolicy) { continue }
+
+        if ($slaPolicy.Id) {
+            $backupTypes = Get-SlaBackupTypesFromDestination -PolicyDestination $slaPolicy.Destination
+            if (-not $backupTypes -or $backupTypes.Count -eq 0) { $backupTypes = @('Ec2Snapshot') }
+            foreach ($bt in $backupTypes) {
+                Write-Host "SLA: sessions for '$($slaPolicy.Name)' ($($slaPolicy.Id)) VM $vmId type=$bt $periodStart..$periodEnd"
+                try {
+                    $slaResp = Get-SlaPolicyInstanceSessions -PolicyId $slaPolicy.Id -ResourceId $vmId -BackupType $bt -ScheduleType 'Daily' -PeriodStart $periodStart -PeriodEnd $periodEnd
+                    foreach ($s in $slaResp.sessions) {
+                        $slaObjs += [PSCustomObject]@{
+                            'VM Order'     = $vmOrderMap[$vmName]
+                            'Start Sort'   = ([datetime]$s.startTimeLocal.time)
+                            'VM Name'      = $vmName
+                            'Policy ID'    = $slaPolicy.Id
+                            'Policy Name'  = $slaPolicy.Name
+                            'Session Type' = $s.sessionType
+                            'Result'       = $s.result
+                            'Session ID'   = $s.sessionId
+                            'Start Time'   = $s.startTimeLocal.time
+                            'Stop Time'    = $null
+                            'Duration (s)' = $null
+                            'Source'       = 'SLA'
+                        }
+                    }
+                } catch {
+                    Write-Host ("SLA error for policyId {0}, vmId {1}: {2}" -f $slaPolicy.Id, $vmId, $_.Exception.Message)
+                }
+            }
+        } elseif ($slaPolicy.Name) {
+            $classic = Find-ClassicPolicyIdByNameAndVm -PolicyName $slaPolicy.Name -VmId $vmId
+            if ($classic -and $classic.Id) {
+                Write-Host "Classic fallback: '$($classic.Name)' ($($classic.Id)) contains VM $vmId"
+                $sessions = Get-PolicyInstanceSessions -policyId $classic.Id -vmId $vmId
+                foreach ($session in $sessions) {
+                    $classicObjs += [PSCustomObject]@{
+                        'VM Order'     = $vmOrderMap[$vmName]
+                        'Start Sort'   = ([datetime]$session.startTime)
+                        'VM Name'      = $vmName
+                        'Policy ID'    = $classic.Id
+                        'Policy Name'  = $classic.Name
+                        'Session Type' = $session.sessionType
+                        'Result'       = $session.result
+                        'Session ID'   = $session.sessionId
+                        'Start Time'   = $session.startTime
+                        'Stop Time'    = $session.stopTime
+                        'Duration (s)' = $session.duration
+                        'Source'       = 'Classic'
+                    }
+                }
+            } else {
+                Write-Host "Classic fallback: couldn’t find classic policy by name '$($slaPolicy.Name)' that contains VM $vmId."
             }
         }
     }
 }
 
+$policySessionObjects = $classicObjs + $slaObjs
+$ordered = $policySessionObjects | Sort-Object `
+    'VM Order', @{ Expression = { $_.'Start Sort' }; Descending = $true }
 
-if ($policySessionObjects.Count -gt 0) {
+if ($ordered.Count -gt 0) {
 
-$htmlHeader = @"
+    $rowsHtml = $ordered | ForEach-Object {
+        $rowData = $_
+        $resultStyle = switch ($rowData.'Result') {
+            'Success' { 'class="success"' }
+            'Failed'  { 'class="failed"' }
+            'Warning' { 'class="warning"' }
+            Default   { '' }
+        }
+        "<tr>" +
+        "<td>$($rowData.'VM Name')</td>" +
+        "<td>$($rowData.'Policy Name')</td>" +
+        "<td>$($rowData.'Session Type')</td>" +
+        "<td $resultStyle>$($rowData.'Result')</td>" +
+        "<td>$($rowData.'Session ID')</td>" +
+        "<td>$($rowData.'Start Time')</td>" +
+        "<td>$($rowData.'Stop Time')</td>" +
+        "<td>$($rowData.'Duration (s)')</td>" +
+        "</tr>"
+    }
+
+    # ---- File paths ----
+    $currentDate = Get-Date -Format "yyyy-MM-dd"
+    $htmlFileName = "$currentDate-PolicySessionReport.html"
+    $csvFileName  = "$currentDate-PolicySessionReport.csv"
+
+    # Fallback for ISE/console where $PSScriptRoot may be empty
+    if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+        $outDir = (Get-Location).Path
+    } else {
+        $outDir = $PSScriptRoot
+    }
+
+    $htmlFilePath = Join-Path -Path $outDir -ChildPath $htmlFileName
+    $csvFilePath  = Join-Path -Path $outDir -ChildPath $csvFileName
+
+    # ---- HTML ----
+    $htmlHeader = @"
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -321,55 +580,20 @@ $htmlHeader = @"
         </tr>
 "@
 
-$htmlFooter = @"
+    $htmlFooter = @"
     </table>
 </body>
 </html>
 "@
 
-# Construct the HTML for each row based on the policy session objects
-$rowsHtml = $policySessionObjects | ForEach-Object {
-    $rowData = $_
-    $resultStyle = switch ($rowData.'Result') {
-        'Success' { 'class="success"' }
-        'Failed'  { 'class="failed"' }
-        'Warning' { 'class="warning"' }
-        Default   { '' } # Default, no additional class
-    }
-    $rowHtml = "<tr>"
-    $rowHtml += "<td>$($rowData.'VM Name')</td>"
-    $rowHtml += "<td>$($rowData.'Policy Name')</td>"
-    $rowHtml += "<td>$($rowData.'Session Type')</td>"
-    $rowHtml += "<td $resultStyle>$($rowData.'Result')</td>" # Apply conditional formatting here
-    $rowHtml += "<td>$($rowData.'Session ID')</td>"
-    $rowHtml += "<td>$($rowData.'Start Time')</td>"
-    $rowHtml += "<td>$($rowData.'Stop Time')</td>"
-    $rowHtml += "<td>$($rowData.'Duration (s)')</td>"
-    $rowHtml += "</tr>"
-    $rowHtml
-}
+    $htmlContent = $htmlHeader + ($rowsHtml -join [Environment]::NewLine) + $htmlFooter
+    $htmlContent | Out-File -FilePath $htmlFilePath -Encoding UTF8
+    Write-Host "HTML report saved to $htmlFilePath"
 
-# Building the Output
-$currentDate = Get-Date -Format "yyyy-MM-dd"
-
-# Define file names with the current date
-$htmlFileName = "$currentDate-PolicySessionReport.html"
-$csvFileName = "$currentDate-PolicySessionReport.csv"
-
-# Define file paths relative to the current script's directory
-$htmlFilePath = Join-Path -Path $PSScriptRoot -ChildPath $htmlFileName
-$csvFilePath = Join-Path -Path $PSScriptRoot -ChildPath $csvFileName
-
-# Combine all parts of the HTML
-$htmlContent = $htmlHeader + $rowsHtml + $htmlFooter
-
-# Output to HTML file
-$htmlContent | Out-File -FilePath $htmlFilePath
-Write-Host "HTML report saved to $htmlFilePath"
-
-# Export to CSV file
-$policySessionObjects | Export-Csv -Path $csvFilePath -NoTypeInformation
-Write-Host "CSV report saved to $csvFilePath"
+    $ordered |
+      Select-Object 'VM Name','Policy Name','Session Type','Result','Session ID','Start Time','Stop Time','Duration (s)' |
+      Export-Csv -Path $csvFilePath -NoTypeInformation
+    Write-Host "CSV report saved to $csvFilePath"
 
 } else {
     Write-Host "No policy session information was found for any VMs."
