@@ -1,0 +1,8 @@
+{
+  "baseUrl": "https://veeamone.yourdomain.com:1239",
+  "username": "DOMAIN\\VONEADMINUSER",
+  "password": "YOURPASS",
+  "apiVersion": "v2.3",
+  "limit": 1000,
+  "ignoreSslErrors": true
+}
