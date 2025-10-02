@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Veeam ONE Alarms Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f1115; --card:#171a21; --muted:#9aa4b2; --txt:#e3e7ee;--ok:#2ecc71;--warn:#f5b35c;--err:#e74c3c;--info:#3498db;--ack:#2ecbd3;
+}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);font-family:'Roboto',ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans",sans-serif}
+    h1{font-size:1.3rem;margin:1rem 0 .25rem}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+    .grid{display:grid;gap:16px}
+    .grid-3{grid-template-columns:repeat(3,1fr)}
+    .grid-2{display:grid;gap:16px;grid-template-columns: 0.6fr 1.4fr;}
+    @media (max-width: 1024px){.grid-2{ grid-template-columns: 1fr; }  }
+    label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:6px}
+    select,button{border:1px solid #2a2f3a;background:#0e1117;color:var(--txt);padding:10px;border-radius:10px}
+    button{cursor:pointer;background:#1f6feb;border-color:#1f6feb;font-weight:600}
+    .help{color:var(--muted);font-size:.85rem}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;margin-left:6px}
+    .pill.err{background:rgba(229,83,75,.15);border:1px solid var(--err);color:#ffd5d1}
+    .pill.warn{background:rgba(230,167,0,.15);border:1px solid var(--warn);color:#ffe9b3}
+    .pill.info{background:rgba(58,160,246,.15);border:1px solid var(--info);color:#cfe7ff}
+    .pill.ack{background:rgba(139,92,246,.15);border:1px solid var(--ack);color:#e6ddff}
+    .pill.res{background:rgba(31,169,113,.15);border:1px solid var(--ok);color:#d3ffe9}
+    table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden}
+    thead{background:#0e121a}
+    th,td{padding:10px 12px;border-bottom:1px solid #232838;text-align:left;font-size:.92rem}
+    tbody tr:hover{background:#121622}
+    .sticky{position:sticky;top:0;z-index:1}
+    .charts{min-height:340px}
+    .chart { height: 280px; }
+    .highcharts-background, 
+    .highcharts-plot-background { fill: transparent !important; }
+    .highcharts-root { filter: none !important; }
+    .caption{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+    .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .spacer{flex:1}
+    .chips{display:flex;gap:10px;flex-wrap:wrap}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:#0e1117;border:1px solid #2a2f3a;padding:6px 10px;border-radius:999px;cursor:pointer;user-select:none}
+    .chip input{accent-color:#1f6feb}
+    .dot{width:10px;height:10px;border-radius:50%;}
+    .dot.res{background:var(--ok)} .dot.warn{background:var(--warn)}
+    .dot.err{background:var(--err)} .dot.info{background:var(--info)} .dot.ack{background:var(--ack)}
+    .multi{position:relative;min-width:260px}
+    .multi-btn{display:inline-flex;align-items:center;gap:6px;background:#0e1117;border:1px solid #2a2f3a;
+      padding:8px 12px;border-radius:10px;color:var(--txt);cursor:pointer}
+    .multi-menu{position:absolute;z-index:20;top:110%;left:0;background:#0e1117;border:1px solid #2a2f3a;
+      border-radius:10px;padding:8px;min-width:260px;display:none;box-shadow:0 8px 20px rgba(0,0,0,.35)}
+    .multi-menu.open{display:block}
+    .multi-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px}
+    .multi-opt:hover{background:#141922}
+    .multi-opt input{accent-color:#1f6feb}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .dot.res{background:var(--ok)} .dot.warn{background:var(--warn)}
+    .dot.err{background:var(--err)} .dot.info{background:var(--info)} .dot.ack{background:var(--ack)}
+
+
+  </style>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Veeam ONE Alarms Dashboard</h1>
+
+    <div class="card toolbar" style="margin-bottom:12px">
+      <div>
+        <label for="filterType" style="margin:0 0 4px;display:block">Type</label>
+        <select id="filterType" title="Filter by object type">
+          <option value="all" selected>All</option>
+          <option value="vsphere">Virtual Infrastructure (VSphere*)</option>
+          <option value="vbr">Veeam Backup & Replication (Vbr*)</option>
+          <option value="vb365">Veeam Backup 365 (Vb365*)</option>
+        </select>
+      </div>
+    
+      <div>
+        <label style="margin:0 0 4px;display:block">Status</label>
+        <div class="multi" id="statusMulti">
+          <button type="button" class="multi-btn" id="statusBtn">All ▾</button>
+          <div class="multi-menu" id="statusMenu">
+            <label class="multi-opt"><input type="checkbox" value="__ALL__" checked> All</label>
+            <label class="multi-opt"><input type="checkbox" value="Error"        checked><span class="dot err"></span>Error</label>
+            <label class="multi-opt"><input type="checkbox" value="Warning"      checked><span class="dot warn"></span>Warning</label>
+            <label class="multi-opt"><input type="checkbox" value="Information"  checked><span class="dot info"></span>Information</label>
+            <label class="multi-opt"><input type="checkbox" value="Acknowledged" checked><span class="dot ack"></span>Acknowledged</label>
+            <label class="multi-opt"><input type="checkbox" value="Resolved"     checked><span class="dot res"></span>Resolved</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+      <div>
+        <label for="refreshSel" style="margin:0 0 4px;display:block">Auto refresh</label>
+        <select id="refreshSel">
+          <option value="0">Off</option>
+          <option value="15">15 sec</option>
+          <option value="30">30 sec</option>
+          <option value="60" selected>1 min</option>
+          <option value="120">2 min</option>
+          <option value="300">5 min</option>
+          <option value="600">10 min</option>
+        </select>
+      </div>
+      <button id="btnRefreshNow">Refresh now</button>
+      <div id="status" class="help"></div>
+    </div>
+    
+
+    <div class="grid grid-3 charts">
+      <div class="card"><div class="caption"><strong>Hosts status</strong></div><div id="chart-hosts" class="chart"></div></div> 
+      <div class="card"><div class="caption"><strong>Datastores status</strong></div><div id="chart-ds" class="chart"></div></div>
+      <div class="card"><div class="caption"><strong>Virtual machines status</strong></div><div id="chart-vms" class="chart"></div></div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:16px">
+      <div class="card">
+        <div class="caption"><strong>Latest triggered alarms</strong><span class="pill info" id="count-latest">0</span></div>
+        <table id="tbl-latest">
+          <thead class="sticky"><tr><th>Status</th><th>Time</th><th>Source</th><th>Name</th><th>Description</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="caption"><strong>Alarms by object</strong><span class="pill info" id="count-objects">0</span></div>
+        <table id="tbl-objects">
+          <thead class="sticky">
+            <tr>
+              <th>Object</th>
+              <th>Type</th>
+              <th title="Errors">⛔</th>
+              <th title="Warnings">⚠️</th>
+              <th title="Information">ℹ️</th>
+              <th title="Acknowledged">📌</th>
+              <th title="Resolved">✅</th>
+              <th title="Total">∑</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+function normalizeStatus(s){
+  const x = (s || '').toLowerCase();
+  if (x.includes('error'))   return 'Error';
+  if (x.includes('warning')) return 'Warning';
+  if (x.includes('ack'))     return 'Acknowledged';
+  if (x.includes('info'))    return 'Information';
+  if (x.includes('resolv'))  return 'Resolved';
+  return s || 'Unknown';
+}
+
+const STATUS_COLORS = {
+  Resolved:     getComputedStyle(document.documentElement).getPropertyValue('--ok').trim(),
+  Warning:      getComputedStyle(document.documentElement).getPropertyValue('--warn').trim(),
+  Error:        getComputedStyle(document.documentElement).getPropertyValue('--err').trim(),
+  Information:  getComputedStyle(document.documentElement).getPropertyValue('--info').trim(),
+  Acknowledged: getComputedStyle(document.documentElement).getPropertyValue('--ack').trim()
+};
+
+function toPoint([name, y]){
+  const c = STATUS_COLORS[name] || '#888';
+  return { name, y, color: c };
+}
+
+const FILTERS = {
+  all: () => true,
+  vsphere: (t) => /^VSphere|^VirtualInfrastructure/i.test(t || ''),
+  vbr:     (t) => /^Vbr/i.test(t || ''),
+  vb365:   (t) => /^Vb365/i.test(t || '')
+};
+
+const STATUS_FILTERS = {
+  all:          () => true,
+  Error:        s => s === 'Error',
+  Warning:      s => s === 'Warning',
+  Information:  s => s === 'Information',
+  Acknowledged: s => s === 'Acknowledged',
+  Resolved:     s => s === 'Resolved'
+};
+
+function getSelectedStatuses(){
+  const boxes = Array.from(document.querySelectorAll('.statusChk'));
+  const sel = boxes.filter(b => b.checked).map(b => b.value);
+  return sel;
+}
+
+function getSelectedStatuses(){
+  const menu = document.getElementById('statusMenu');
+  const allBox = menu.querySelector('input[value="__ALL__"]');
+  const boxes  = [...menu.querySelectorAll('input[type="checkbox"]:not([value="__ALL__"])')];
+  const selected = boxes.filter(b => b.checked).map(b => b.value);
+  return (allBox.checked || selected.length === 0) ? [] : selected;
+}
+
+function syncStatusAll(e){
+  const menu = document.getElementById('statusMenu');
+  const allBox = menu.querySelector('input[value="__ALL__"]');
+  const boxes  = [...menu.querySelectorAll('input[type="checkbox"]:not([value="__ALL__"])')];
+
+  if (e && e.target === allBox){
+    boxes.forEach(b => b.checked = allBox.checked);
+  } else {
+    const anySpecific = boxes.some(b => b.checked);
+    allBox.checked = !anySpecific;      // none => All
+  }
+  updateStatusBtnLabel();
+}
+
+function updateStatusBtnLabel(){
+  const btn = document.getElementById('statusBtn');
+  const sel = getSelectedStatuses();
+  if (sel.length === 0) btn.textContent = 'All ▾';
+  else if (sel.length === 1) btn.textContent = sel[0] + ' ▾';
+  else btn.textContent = `${sel.length} selected ▾`;
+}
+
+function applyFilters(items, typeKey, selectedStatuses){
+  const typePred = (FILTERS[typeKey] || FILTERS.all);
+  const allowed  = new Set(selectedStatuses && selectedStatuses.length ? selectedStatuses : 
+                           ['Error','Warning','Information','Acknowledged','Resolved']);
+  return items.filter(it => {
+    const typeOk = typePred(it?.alarmSource?.objectType);
+    const stat   = normalizeStatus(it?.status);
+    return typeOk && allowed.has(stat);
+  });
+}
+
+(function(){
+  const $ = s => document.querySelector(s);
+  const setStatus = (m,g=false)=>{ const el=$('#status'); el.textContent=m; el.style.color=g?'#1fa971':'#e5534b'; };
+
+  function pillClass(s){ s=(s||'').toLowerCase();
+    if(s.includes('error'))return'err';
+    if(s.includes('warn'))return'warn';
+    if(s.includes('ack'))return'ack';
+    if(s.includes('info'))return'info';
+    if(s.includes('resolv'))return'res';
+    return'';
+  }
+  const fmt=(iso)=>{ try{return new Date(iso).toLocaleString()}catch{return iso} };
+  const cut=(t,n)=> t&&t.length>n? t.slice(0,n-1)+'…' : (t||'');
+  const esc=(s)=> (s||'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function renderDonut(el, title, map){
+  const data = Object.entries(map||{})
+    .map(toPoint)
+    .sort((a,b)=>b.y-a.y);
+
+  Highcharts.chart(el, {
+    chart: {
+      type:'pie',
+      backgroundColor:'transparent',
+      height: document.querySelector('#'+el)?.classList.contains('chart') ? null : 280,
+      spacing:[8,8,8,8]
+    },
+    title:{ text:null },
+    legend:{
+      enabled:true,
+      layout:'horizontal',
+      align:'center',
+      verticalAlign:'bottom',
+      itemStyle:{ color: getComputedStyle(document.documentElement).getPropertyValue('--txt').trim() }
+    },
+    tooltip:{ pointFormat:'<b>{point.y}</b>' },
+    credits:{ enabled:false },
+    plotOptions:{
+      pie:{
+        innerSize:'65%',
+        borderWidth:0,
+        shadow:false,
+        size:'100%',
+        dataLabels:{
+          enabled:true,
+          distance:12,
+          style:{ textOutline:'none', color:getComputedStyle(document.documentElement).getPropertyValue('--txt').trim(), fontSize:'12px' },
+          formatter:function(){ return `${this.point.name}: ${this.y}`; }
+        },
+        states:{
+          hover:{ brightness:-0.25 }
+        }
+      }
+    },
+    series:[{ name:title, data }]
+  });
+}
+
+  function buildCharts(items){
+    const byType={ VSphereHost:{}, VSphereDatastore:{}, VSphereVm:{} };
+    for(const it of items){
+      const t=it.alarmSource?.objectType;
+      const st=normalizeStatus(it.status);
+      if(byType[t]) byType[t][st]=(byType[t][st]||0)+1;
+    }
+    renderDonut('chart-hosts','Host status',byType['VSphereHost']);
+    renderDonut('chart-ds','Datastore status',byType['VSphereDatastore']);
+    renderDonut('chart-vms','VM status',byType['VSphereVm']);
+  }
+
+  function buildLatestTable(items){
+    const tbody=$('#tbl-latest tbody'); tbody.innerHTML='';
+    const sorted=[...items].sort((a,b)=>new Date(b.triggeredTime)-new Date(a.triggeredTime)).slice(0,50);
+    $('#count-latest').textContent=sorted.length;
+    for(const it of sorted){
+      const tr=document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="pill ${pillClass(it.status)}">${it.status}</span></td>
+        <td>${fmt(it.triggeredTime)}</td>
+        <td>${esc(it.alarmSource?.objectName||'')}</td>
+        <td>${esc(it.name||'')}</td>
+        <td title="${esc(it.description||'')}">${esc(cut(it.description||'',140))}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function buildObjectsTable(items){
+    const map=new Map();
+    for(const it of items){
+      const src=it.alarmSource||{};
+      const key = `${src.objectType}|${src.objectName}`;
+      const st=normalizeStatus(it.status);
+      if(!map.has(key)){
+        map.set(key,{objectName:src.objectName,objectType:src.objectType,Error:0,Warning:0,Information:0,Acknowledged:0,Resolved:0,Total:0});
+      }
+      const row=map.get(key); row[st]=(row[st]||0)+1; row.Total+=1;
+    }
+    const rows=Array.from(map.values()).sort((a,b)=>b.Total-a.Total).slice(0,100);
+    $('#count-objects').textContent=rows.length;
+    const tbody=$('#tbl-objects tbody'); tbody.innerHTML='';
+    for(const r of rows){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${esc(r.objectName||'')}</td><td>${esc(r.objectType||'')}</td>
+                    <td>${r.Error||0}</td><td>${r.Warning||0}</td><td>${r.Information||0}</td>
+                    <td>${r.Acknowledged||0}</td><td>${r.Resolved||0}</td><td><strong>${r.Total}</strong></td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  async function loadDataJson(){
+    const url = `data.json?_=${Date.now()}`;
+    const r = await fetch(url, { cache:'no-store' });
+    if(!r.ok) throw new Error(`data.json ${r.status} ${r.statusText}`);
+    return r.json();
+  }
+
+  let __timer = null;
+  function startAutoRefresh(sec){
+    if (__timer) { clearInterval(__timer); __timer = null; }
+    if (sec && Number(sec) > 0){
+      __timer = setInterval(refreshAll, Number(sec) * 1000);
+    }
+  }
+
+  async function refreshAll(){
+  try{
+    const data  = await loadDataJson();
+    const raw       = Array.isArray(data.items) ? data.items : [];
+    const typeKey   = document.querySelector('#filterType').value;
+    const statuses  = getSelectedStatuses();
+
+    const typePred = (FILTERS[typeKey] || FILTERS.all);
+    const allowed  = new Set(statuses.length ? statuses : ['Error','Warning','Information','Acknowledged','Resolved']);
+    const items    = raw.filter(it => typePred(it?.alarmSource?.objectType) && allowed.has(normalizeStatus(it?.status)));
+
+    buildCharts(items);
+    buildLatestTable(items);
+    buildObjectsTable(items);
+
+    const typeLabel = { all:'All', vsphere:'vSphere', vbr:'VBR', vb365:'VB365' }[typeKey] || typeKey;
+    const statLabel = statuses.length ? statuses.join(', ') : 'All';
+    setStatus(`Updated ${new Date(data.generatedAt).toLocaleString()} — showing ${items.length}/${raw.length} (Type: ${typeLabel}, Status: ${statLabel})`, true);
+  }catch(err){
+    setStatus(String(err), false);
+  }
+}
+
+
+window.addEventListener('DOMContentLoaded', ()=> {
+  refreshAll();
+
+  const sel = document.querySelector('#refreshSel');
+  startAutoRefresh(Number(sel.value));
+  document.querySelector('#btnRefreshNow').addEventListener('click', refreshAll);
+  sel.addEventListener('change', e => startAutoRefresh(Number(e.target.value)));
+  document.querySelector('#filterType').addEventListener('change', refreshAll);
+
+  const multi = document.getElementById('statusMulti');
+  const menu  = document.getElementById('statusMenu');
+  const btn   = document.getElementById('statusBtn');
+
+  btn.addEventListener('click', (e)=>{ e.stopPropagation(); menu.classList.toggle('open'); });
+  document.addEventListener('click', (e)=>{ if (!multi.contains(e.target)) menu.classList.remove('open'); });
+
+  menu.addEventListener('change', (e)=>{ syncStatusAll(e); refreshAll(); });
+
+  updateStatusBtnLabel();
+});
+
+
+})();
+</script>
+</body>
+</html>
