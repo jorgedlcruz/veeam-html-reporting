@@ -4,405 +4,1053 @@
   <meta charset="utf-8" />
   <title>Veeam ONE Alarms Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0f1115; --card:#171a21; --muted:#9aa4b2; --txt:#e3e7ee;--ok:#2ecc71;--warn:#f5b35c;--err:#e74c3c;--info:#3498db;--ack:#2ecbd3;
-}
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);font-family:'Roboto',ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans",sans-serif}
-    h1{font-size:1.3rem;margin:1rem 0 .25rem}
-    .wrap{max-width:1200px;margin:0 auto;padding:16px}
-    .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.25)}
-    .grid{display:grid;gap:16px}
-    .grid-3{grid-template-columns:repeat(3,1fr)}
-    .grid-2{display:grid;gap:16px;grid-template-columns: 0.6fr 1.4fr;}
-    @media (max-width: 1024px){.grid-2{ grid-template-columns: 1fr; }  }
-    label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:6px}
-    select,button{border:1px solid #2a2f3a;background:#0e1117;color:var(--txt);padding:10px;border-radius:10px}
-    button{cursor:pointer;background:#1f6feb;border-color:#1f6feb;font-weight:600}
-    .help{color:var(--muted);font-size:.85rem}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;margin-left:6px}
-    .pill.err{background:rgba(229,83,75,.15);border:1px solid var(--err);color:#ffd5d1}
-    .pill.warn{background:rgba(230,167,0,.15);border:1px solid var(--warn);color:#ffe9b3}
-    .pill.info{background:rgba(58,160,246,.15);border:1px solid var(--info);color:#cfe7ff}
-    .pill.ack{background:rgba(139,92,246,.15);border:1px solid var(--ack);color:#e6ddff}
-    .pill.res{background:rgba(31,169,113,.15);border:1px solid var(--ok);color:#d3ffe9}
-    table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden}
-    thead{background:#0e121a}
-    th,td{padding:10px 12px;border-bottom:1px solid #232838;text-align:left;font-size:.92rem}
-    tbody tr:hover{background:#121622}
-    .sticky{position:sticky;top:0;z-index:1}
-    .charts{min-height:340px}
-    .chart { height: 280px; }
-    .highcharts-background, 
-    .highcharts-plot-background { fill: transparent !important; }
-    .highcharts-root { filter: none !important; }
-    .caption{display:flex;align-items:center;gap:8px;margin:0 0 8px}
-    .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .spacer{flex:1}
-    .chips{display:flex;gap:10px;flex-wrap:wrap}
-    .chip{display:inline-flex;align-items:center;gap:6px;background:#0e1117;border:1px solid #2a2f3a;padding:6px 10px;border-radius:999px;cursor:pointer;user-select:none}
-    .chip input{accent-color:#1f6feb}
-    .dot{width:10px;height:10px;border-radius:50%;}
-    .dot.res{background:var(--ok)} .dot.warn{background:var(--warn)}
-    .dot.err{background:var(--err)} .dot.info{background:var(--info)} .dot.ack{background:var(--ack)}
-    .multi{position:relative;min-width:260px}
-    .multi-btn{display:inline-flex;align-items:center;gap:6px;background:#0e1117;border:1px solid #2a2f3a;
-      padding:8px 12px;border-radius:10px;color:var(--txt);cursor:pointer}
-    .multi-menu{position:absolute;z-index:20;top:110%;left:0;background:#0e1117;border:1px solid #2a2f3a;
-      border-radius:10px;padding:8px;min-width:260px;display:none;box-shadow:0 8px 20px rgba(0,0,0,.35)}
-    .multi-menu.open{display:block}
-    .multi-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px}
-    .multi-opt:hover{background:#141922}
-    .multi-opt input{accent-color:#1f6feb}
-    .dot{width:10px;height:10px;border-radius:50%}
-    .dot.res{background:var(--ok)} .dot.warn{background:var(--warn)}
-    .dot.err{background:var(--err)} .dot.info{background:var(--info)} .dot.ack{background:var(--ack)}
-
-
+    * { box-sizing: border-box; }
+    
+    :root {
+      --bg-primary: #0a0e14;
+      --bg-secondary: #0f1419;
+      --surface: rgba(20, 25, 35, 0.6);
+      --surface-hover: rgba(25, 32, 45, 0.8);
+      --border: rgba(255, 255, 255, 0.06);
+      --border-hover: rgba(255, 255, 255, 0.12);
+      
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      
+      --status-error: #ff6b6b;
+      --status-error-bg: rgba(255, 107, 107, 0.1);
+      --status-error-border: rgba(255, 107, 107, 0.3);
+      
+      --status-warning: #ffd93d;
+      --status-warning-bg: rgba(255, 217, 61, 0.1);
+      --status-warning-border: rgba(255, 217, 61, 0.3);
+      
+      --status-info: #6bcfff;
+      --status-info-bg: rgba(107, 207, 255, 0.1);
+      --status-info-border: rgba(107, 207, 255, 0.3);
+      
+      --status-ack: #c084fc;
+      --status-ack-bg: rgba(192, 132, 252, 0.1);
+      --status-ack-border: rgba(192, 132, 252, 0.3);
+      
+      --status-resolved: #51cf66;
+      --status-resolved-bg: rgba(81, 207, 102, 0.1);
+      --status-resolved-border: rgba(81, 207, 102, 0.3);
+      
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+    
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 400px;
+      background: radial-gradient(ellipse at top, rgba(59, 130, 246, 0.15), transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    
+    .wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      position: relative;
+      z-index: 1;
+    }
+    
+    header {
+      margin-bottom: 2rem;
+      animation: fadeInDown 0.6s ease-out;
+    }
+    
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+    
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+    }
+    
+    .card {
+      background: var(--surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-md);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: fadeInUp 0.6s ease-out backwards;
+    }
+    
+    .card:hover {
+      border-color: var(--border-hover);
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+    
+    .grid {
+      display: grid;
+      gap: 1.5rem;
+    }
+    
+    .grid-3 {
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+    
+    .grid-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+    
+    @media (max-width: 1024px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .wrap {
+        padding: 1rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+    }
+    
+    .toolbar {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+      animation-delay: 0.1s;
+      position: relative;
+      z-index: 100;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-width: 180px;
+    }
+    
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    /* <CHANGE> Added font-weight: 500 to match Status Filter button style */
+    select, button {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 0.65rem 1rem;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    
+    select:hover, select:focus {
+      border-color: var(--border-hover);
+      background: var(--surface-hover);
+      outline: none;
+    }
+    
+    button {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      font-weight: 600;
+      padding: 0.65rem 1.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+    
+    button:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .spacer {
+      flex: 1;
+    }
+    
+    .status-text {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-family: 'JetBrains Mono', monospace;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .status-text.success {
+      color: var(--status-resolved);
+    }
+    
+    .status-text.error {
+      color: var(--status-error);
+    }
+    
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .multi {
+      position: relative;
+      min-width: 200px;
+    }
+    
+    .multi-btn {
+      width: 100%;
+      justify-content: space-between;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    
+    .multi-btn:hover {
+      background: var(--surface-hover);
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .multi-menu {
+      position: absolute;
+      z-index: 1000;
+      top: calc(100% + 0.5rem);
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.5rem;
+      display: none;
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    
+    .multi-menu.open {
+      display: block;
+      animation: slideDown 0.2s ease-out;
+    }
+    
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .multi-opt {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      font-size: 0.9rem;
+    }
+    
+    .multi-opt:hover {
+      background: var(--surface-hover);
+    }
+    
+    /* <CHANGE> Added flex-shrink: 0 and min dimensions to ensure consistent checkbox sizing */
+    .multi-opt input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      min-width: 16px;
+      min-height: 16px;
+      flex-shrink: 0;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+    
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    
+    .dot.err { background: var(--status-error); }
+    .dot.warn { background: var(--status-warning); }
+    .dot.info { background: var(--status-info); }
+    .dot.ack { background: var(--status-ack); }
+    .dot.res { background: var(--status-resolved); }
+    
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      border: 1px solid;
+    }
+    
+    .pill.err {
+      background: var(--status-error-bg);
+      border-color: var(--status-error-border);
+      color: var(--status-error);
+    }
+    
+    .pill.warn {
+      background: var(--status-warning-bg);
+      border-color: var(--status-warning-border);
+      color: var(--status-warning);
+    }
+    
+    .pill.info {
+      background: var(--status-info-bg);
+      border-color: var(--status-info-border);
+      color: var(--status-info);
+    }
+    
+    .pill.ack {
+      background: var(--status-ack-bg);
+      border-color: var(--status-ack-border);
+      color: var(--status-ack);
+    }
+    
+    .pill.res {
+      background: var(--status-resolved-bg);
+      border-color: var(--status-resolved-border);
+      color: var(--status-resolved);
+    }
+    
+    .chart-container {
+      height: 300px;
+      position: relative;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.875rem;
+    }
+    
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg-secondary);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    
+    th {
+      padding: 0.875rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    td {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      max-width: 0;
+    }
+    
+    tbody tr {
+      transition: background 0.15s ease;
+    }
+    
+    tbody tr:hover {
+      background: var(--surface-hover);
+    }
+    
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .table-wrapper {
+      max-height: 600px;
+      overflow-y: auto;
+      border-radius: 8px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar-track {
+      background: var(--bg-secondary);
+      border-radius: 4px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar-thumb {
+      background: var(--border-hover);
+      border-radius: 4px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+    
+    .highcharts-background {
+      fill: transparent !important;
+    }
+    
+    .highcharts-plot-background {
+      fill: transparent !important;
+    }
+    
+    .highcharts-root {
+      font-family: 'Inter', sans-serif !important;
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .charts .card:nth-child(1) { animation-delay: 0.2s; }
+    .charts .card:nth-child(2) { animation-delay: 0.3s; }
+    .charts .card:nth-child(3) { animation-delay: 0.4s; }
+    
+    .grid-2 .card:nth-child(1) { animation-delay: 0.5s; }
+    .grid-2 .card:nth-child(2) { animation-delay: 0.6s; }
   </style>
   <script src="https://code.highcharts.com/highcharts.js"></script>
 </head>
 <body>
   <div class="wrap">
-    <h1>Veeam ONE Alarms Dashboard</h1>
+    <header>
+      <h1>Veeam ONE Alarms Dashboard</h1>
+      <div class="subtitle">Real-time infrastructure monitoring & alerting</div>
+    </header>
 
-    <div class="card toolbar" style="margin-bottom:12px">
-      <div>
-        <label for="filterType" style="margin:0 0 4px;display:block">Type</label>
+    <div class="card toolbar">
+      <div class="form-group">
+        <label for="filterType">Object Type</label>
         <select id="filterType" title="Filter by object type">
-          <option value="all" selected>All</option>
-          <option value="vsphere">Virtual Infrastructure (VSphere*)</option>
-          <option value="vbr">Veeam Backup & Replication (Vbr*)</option>
-          <option value="vb365">Veeam Backup 365 (Vb365*)</option>
+          <option value="all" selected>All Infrastructure</option>
+          <option value="vsphere">vSphere (Virtual)</option>
+          <option value="vbr">Backup & Replication</option>
+          <option value="vb365">Backup 365</option>
         </select>
       </div>
     
-      <div>
-        <label style="margin:0 0 4px;display:block">Status</label>
+      <div class="form-group">
+        <label>Status Filter</label>
         <div class="multi" id="statusMulti">
-          <button type="button" class="multi-btn" id="statusBtn">All ▾</button>
+          <button type="button" class="multi-btn" id="statusBtn">
+            <span>All Statuses</span>
+            <span>▾</span>
+          </button>
           <div class="multi-menu" id="statusMenu">
-            <label class="multi-opt"><input type="checkbox" value="__ALL__" checked> All</label>
-            <label class="multi-opt"><input type="checkbox" value="Error"        checked><span class="dot err"></span>Error</label>
-            <label class="multi-opt"><input type="checkbox" value="Warning"      checked><span class="dot warn"></span>Warning</label>
-            <label class="multi-opt"><input type="checkbox" value="Information"  checked><span class="dot info"></span>Information</label>
-            <label class="multi-opt"><input type="checkbox" value="Acknowledged" checked><span class="dot ack"></span>Acknowledged</label>
-            <label class="multi-opt"><input type="checkbox" value="Resolved"     checked><span class="dot res"></span>Resolved</label>
+            <label class="multi-opt">
+              <input type="checkbox" value="__ALL__" checked>
+              <span>All Statuses</span>
+            </label>
+            <label class="multi-opt">
+              <input type="checkbox" value="Error" checked>
+              <span class="dot err"></span>
+              <span>Error</span>
+            </label>
+            <label class="multi-opt">
+              <input type="checkbox" value="Warning" checked>
+              <span class="dot warn"></span>
+              <span>Warning</span>
+            </label>
+            <label class="multi-opt">
+              <input type="checkbox" value="Information" checked>
+              <span class="dot info"></span>
+              <span>Information</span>
+            </label>
+            <label class="multi-opt">
+              <input type="checkbox" value="Acknowledged" checked>
+              <span class="dot ack"></span>
+              <span>Acknowledged</span>
+            </label>
+            <label class="multi-opt">
+              <input type="checkbox" value="Resolved" checked>
+              <span class="dot res"></span>
+              <span>Resolved</span>
+            </label>
           </div>
         </div>
       </div>
 
       <div class="spacer"></div>
-      <div>
-        <label for="refreshSel" style="margin:0 0 4px;display:block">Auto refresh</label>
+      
+      <div class="form-group">
+        <label for="refreshSel">Auto Refresh</label>
         <select id="refreshSel">
-          <option value="0">Off</option>
-          <option value="15">15 sec</option>
-          <option value="30">30 sec</option>
-          <option value="60" selected>1 min</option>
-          <option value="120">2 min</option>
-          <option value="300">5 min</option>
-          <option value="600">10 min</option>
+          <option value="0">Disabled</option>
+          <option value="15">15 seconds</option>
+          <option value="30">30 seconds</option>
+          <option value="60" selected>1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+          <option value="600">10 minutes</option>
         </select>
       </div>
-      <button id="btnRefreshNow">Refresh now</button>
-      <div id="status" class="help"></div>
+      
+      <button id="btnRefreshNow">
+        <span>↻</span>
+        <span>Refresh</span>
+      </button>
+      
+      <div id="status" class="status-text">
+        <span class="status-dot"></span>
+        <span id="statusMsg">Loading...</span>
+      </div>
     </div>
-    
 
     <div class="grid grid-3 charts">
-      <div class="card"><div class="caption"><strong>Hosts status</strong></div><div id="chart-hosts" class="chart"></div></div> 
-      <div class="card"><div class="caption"><strong>Datastores status</strong></div><div id="chart-ds" class="chart"></div></div>
-      <div class="card"><div class="caption"><strong>Virtual machines status</strong></div><div id="chart-vms" class="chart"></div></div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🖥️</span>
+            <span>Hosts Status</span>
+          </div>
+        </div>
+        <div id="chart-hosts" class="chart-container"></div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>💾</span>
+            <span>Datastores Status</span>
+          </div>
+        </div>
+        <div id="chart-ds" class="chart-container"></div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>⚡</span>
+            <span>Virtual Machines</span>
+          </div>
+        </div>
+        <div id="chart-vms" class="chart-container"></div>
+      </div>
     </div>
 
-    <div class="grid grid-2" style="margin-top:16px">
+    <div class="grid grid-2" style="margin-top: 1.5rem">
       <div class="card">
-        <div class="caption"><strong>Latest triggered alarms</strong><span class="pill info" id="count-latest">0</span></div>
-        <table id="tbl-latest">
-          <thead class="sticky"><tr><th>Status</th><th>Time</th><th>Source</th><th>Name</th><th>Description</th></tr></thead>
-          <tbody></tbody>
-        </table>
+        <div class="card-header">
+          <div class="card-title">
+            <span>🔔</span>
+            <span>Latest Triggered Alarms</span>
+          </div>
+          <span class="pill info" id="count-latest">0</span>
+        </div>
+        <div class="table-wrapper">
+          <table id="tbl-latest">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Triggered</th>
+                <th>Source</th>
+                <th>Alarm Name</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
+      
       <div class="card">
-        <div class="caption"><strong>Alarms by object</strong><span class="pill info" id="count-objects">0</span></div>
-        <table id="tbl-objects">
-          <thead class="sticky">
-            <tr>
-              <th>Object</th>
-              <th>Type</th>
-              <th title="Errors">⛔</th>
-              <th title="Warnings">⚠️</th>
-              <th title="Information">ℹ️</th>
-              <th title="Acknowledged">📌</th>
-              <th title="Resolved">✅</th>
-              <th title="Total">∑</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="card-header">
+          <div class="card-title">
+            <span>📊</span>
+            <span>Alarms by Object</span>
+          </div>
+          <span class="pill info" id="count-objects">0</span>
+        </div>
+        <div class="table-wrapper">
+          <table id="tbl-objects">
+            <thead>
+              <tr>
+                <th>Object Name</th>
+                <th>Type</th>
+                <th title="Errors">⛔</th>
+                <th title="Warnings">⚠️</th>
+                <th title="Information">ℹ️</th>
+                <th title="Acknowledged">📌</th>
+                <th title="Resolved">✅</th>
+                <th title="Total">∑</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
 <script>
-function normalizeStatus(s){
-  const x = (s || '').toLowerCase();
-  if (x.includes('error'))   return 'Error';
-  if (x.includes('warning')) return 'Warning';
-  if (x.includes('ack'))     return 'Acknowledged';
-  if (x.includes('info'))    return 'Information';
-  if (x.includes('resolv'))  return 'Resolved';
-  return s || 'Unknown';
-}
-
-const STATUS_COLORS = {
-  Resolved:     getComputedStyle(document.documentElement).getPropertyValue('--ok').trim(),
-  Warning:      getComputedStyle(document.documentElement).getPropertyValue('--warn').trim(),
-  Error:        getComputedStyle(document.documentElement).getPropertyValue('--err').trim(),
-  Information:  getComputedStyle(document.documentElement).getPropertyValue('--info').trim(),
-  Acknowledged: getComputedStyle(document.documentElement).getPropertyValue('--ack').trim()
-};
-
-function toPoint([name, y]){
-  const c = STATUS_COLORS[name] || '#888';
-  return { name, y, color: c };
-}
-
-const FILTERS = {
-  all: () => true,
-  vsphere: (t) => /^VSphere|^VirtualInfrastructure/i.test(t || ''),
-  vbr:     (t) => /^Vbr/i.test(t || ''),
-  vb365:   (t) => /^Vb365/i.test(t || '')
-};
-
-const STATUS_FILTERS = {
-  all:          () => true,
-  Error:        s => s === 'Error',
-  Warning:      s => s === 'Warning',
-  Information:  s => s === 'Information',
-  Acknowledged: s => s === 'Acknowledged',
-  Resolved:     s => s === 'Resolved'
-};
-
-function getSelectedStatuses(){
-  const boxes = Array.from(document.querySelectorAll('.statusChk'));
-  const sel = boxes.filter(b => b.checked).map(b => b.value);
-  return sel;
-}
-
-function getSelectedStatuses(){
-  const menu = document.getElementById('statusMenu');
-  const allBox = menu.querySelector('input[value="__ALL__"]');
-  const boxes  = [...menu.querySelectorAll('input[type="checkbox"]:not([value="__ALL__"])')];
-  const selected = boxes.filter(b => b.checked).map(b => b.value);
-  return (allBox.checked || selected.length === 0) ? [] : selected;
-}
-
-function syncStatusAll(e){
-  const menu = document.getElementById('statusMenu');
-  const allBox = menu.querySelector('input[value="__ALL__"]');
-  const boxes  = [...menu.querySelectorAll('input[type="checkbox"]:not([value="__ALL__"])')];
-
-  if (e && e.target === allBox){
-    boxes.forEach(b => b.checked = allBox.checked);
-  } else {
-    const anySpecific = boxes.some(b => b.checked);
-    allBox.checked = !anySpecific;      // none => All
+(function() {
+  'use strict';
+  
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
+  
+  const STATUS_COLORS = {
+    Resolved: '#51cf66',
+    Warning: '#ffd93d',
+    Error: '#ff6b6b',
+    Information: '#6bcfff',
+    Acknowledged: '#c084fc'
+  };
+  
+  const FILTERS = {
+    all: () => true,
+    vsphere: (t) => /^VSphere|^VirtualInfrastructure/i.test(t || ''),
+    vbr: (t) => /^Vbr/i.test(t || ''),
+    vb365: (t) => /^Vb365/i.test(t || '')
+  };
+  
+  function normalizeStatus(s) {
+    const x = (s || '').toLowerCase();
+    if (x.includes('error')) return 'Error';
+    if (x.includes('warning')) return 'Warning';
+    if (x.includes('ack')) return 'Acknowledged';
+    if (x.includes('info')) return 'Information';
+    if (x.includes('resolv')) return 'Resolved';
+    return s || 'Unknown';
   }
-  updateStatusBtnLabel();
-}
-
-function updateStatusBtnLabel(){
-  const btn = document.getElementById('statusBtn');
-  const sel = getSelectedStatuses();
-  if (sel.length === 0) btn.textContent = 'All ▾';
-  else if (sel.length === 1) btn.textContent = sel[0] + ' ▾';
-  else btn.textContent = `${sel.length} selected ▾`;
-}
-
-function applyFilters(items, typeKey, selectedStatuses){
-  const typePred = (FILTERS[typeKey] || FILTERS.all);
-  const allowed  = new Set(selectedStatuses && selectedStatuses.length ? selectedStatuses : 
-                           ['Error','Warning','Information','Acknowledged','Resolved']);
-  return items.filter(it => {
-    const typeOk = typePred(it?.alarmSource?.objectType);
-    const stat   = normalizeStatus(it?.status);
-    return typeOk && allowed.has(stat);
-  });
-}
-
-(function(){
-  const $ = s => document.querySelector(s);
-  const setStatus = (m,g=false)=>{ const el=$('#status'); el.textContent=m; el.style.color=g?'#1fa971':'#e5534b'; };
-
-  function pillClass(s){ s=(s||'').toLowerCase();
-    if(s.includes('error'))return'err';
-    if(s.includes('warn'))return'warn';
-    if(s.includes('ack'))return'ack';
-    if(s.includes('info'))return'info';
-    if(s.includes('resolv'))return'res';
-    return'';
+  
+  function pillClass(s) {
+    s = (s || '').toLowerCase();
+    if (s.includes('error')) return 'err';
+    if (s.includes('warn')) return 'warn';
+    if (s.includes('ack')) return 'ack';
+    if (s.includes('info')) return 'info';
+    if (s.includes('resolv')) return 'res';
+    return '';
   }
-  const fmt=(iso)=>{ try{return new Date(iso).toLocaleString()}catch{return iso} };
-  const cut=(t,n)=> t&&t.length>n? t.slice(0,n-1)+'…' : (t||'');
-  const esc=(s)=> (s||'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-  function renderDonut(el, title, map){
-  const data = Object.entries(map||{})
-    .map(toPoint)
-    .sort((a,b)=>b.y-a.y);
-
-  Highcharts.chart(el, {
-    chart: {
-      type:'pie',
-      backgroundColor:'transparent',
-      height: document.querySelector('#'+el)?.classList.contains('chart') ? null : 280,
-      spacing:[8,8,8,8]
-    },
-    title:{ text:null },
-    legend:{
-      enabled:true,
-      layout:'horizontal',
-      align:'center',
-      verticalAlign:'bottom',
-      itemStyle:{ color: getComputedStyle(document.documentElement).getPropertyValue('--txt').trim() }
-    },
-    tooltip:{ pointFormat:'<b>{point.y}</b>' },
-    credits:{ enabled:false },
-    plotOptions:{
-      pie:{
-        innerSize:'65%',
-        borderWidth:0,
-        shadow:false,
-        size:'100%',
-        dataLabels:{
-          enabled:true,
-          distance:12,
-          style:{ textOutline:'none', color:getComputedStyle(document.documentElement).getPropertyValue('--txt').trim(), fontSize:'12px' },
-          formatter:function(){ return `${this.point.name}: ${this.y}`; }
+  
+  function toPoint([name, y]) {
+    const c = STATUS_COLORS[name] || '#888';
+    return { name, y, color: c };
+  }
+  
+  function formatDate(iso) {
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
+  }
+  
+  function truncate(text, maxLen) {
+    return text && text.length > maxLen ? text.slice(0, maxLen - 1) + '…' : (text || '');
+  }
+  
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[c]));
+  }
+  
+  function setStatus(msg, isSuccess = false) {
+    const statusEl = $('#status');
+    const msgEl = $('#statusMsg');
+    msgEl.textContent = msg;
+    statusEl.className = isSuccess ? 'status-text success' : 'status-text error';
+  }
+  
+  function getSelectedStatuses() {
+    const menu = $('#statusMenu');
+    const allBox = menu.querySelector('input[value="__ALL__"]');
+    const boxes = [...menu.querySelectorAll('input[type="checkbox"]:not([value="__ALL__"])')];
+    const selected = boxes.filter(b => b.checked).map(b => b.value);
+    return (allBox.checked || selected.length === 0) ? [] : selected;
+  }
+  
+  function syncStatusAll(e) {
+    const menu = $('#statusMenu');
+    const allBox = menu.querySelector('input[value="__ALL__"]');
+    const boxes = [...menu.querySelectorAll('input[type="checkbox"]:not([value="__ALL__"])')];
+    
+    if (e && e.target === allBox) {
+      boxes.forEach(b => b.checked = allBox.checked);
+    } else {
+      const anySpecific = boxes.some(b => b.checked);
+      allBox.checked = !anySpecific;
+    }
+    updateStatusBtnLabel();
+  }
+  
+  function updateStatusBtnLabel() {
+    const btn = $('#statusBtn span:first-child');
+    const sel = getSelectedStatuses();
+    if (sel.length === 0) {
+      btn.textContent = 'All Statuses';
+    } else if (sel.length === 1) {
+      btn.textContent = sel[0];
+    } else {
+      btn.textContent = `${sel.length} Selected`;
+    }
+  }
+  
+  function renderDonut(el, title, map) {
+    const data = Object.entries(map || {})
+      .map(toPoint)
+      .sort((a, b) => b.y - a.y);
+    
+    Highcharts.chart(el, {
+      chart: {
+        type: 'pie',
+        backgroundColor: 'transparent',
+        height: 300,
+        spacing: [10, 10, 10, 10]
+      },
+      title: { text: null },
+      legend: {
+        enabled: true,
+        layout: 'horizontal',
+        align: 'center',
+        verticalAlign: 'bottom',
+        itemStyle: {
+          color: '#e6edf3',
+          fontSize: '12px',
+          fontWeight: '500',
+          fontFamily: 'Inter, sans-serif'
         },
-        states:{
-          hover:{ brightness:-0.25 }
+        itemHoverStyle: {
+          color: '#ffffff'
         }
-      }
-    },
-    series:[{ name:title, data }]
-  });
-}
-
-  function buildCharts(items){
-    const byType={ VSphereHost:{}, VSphereDatastore:{}, VSphereVm:{} };
-    for(const it of items){
-      const t=it.alarmSource?.objectType;
-      const st=normalizeStatus(it.status);
-      if(byType[t]) byType[t][st]=(byType[t][st]||0)+1;
-    }
-    renderDonut('chart-hosts','Host status',byType['VSphereHost']);
-    renderDonut('chart-ds','Datastore status',byType['VSphereDatastore']);
-    renderDonut('chart-vms','VM status',byType['VSphereVm']);
+      },
+      tooltip: {
+        backgroundColor: 'rgba(15, 20, 25, 0.95)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 8,
+        style: {
+          color: '#e6edf3',
+          fontSize: '13px',
+          fontFamily: 'Inter, sans-serif'
+        },
+        pointFormat: '<b>{point.y}</b> alarms'
+      },
+      credits: { enabled: false },
+      plotOptions: {
+        pie: {
+          innerSize: '65%',
+          borderWidth: 0,
+          shadow: false,
+          size: '85%',
+          dataLabels: {
+            enabled: true,
+            distance: 15,
+            style: {
+              textOutline: 'none',
+              color: '#e6edf3',
+              fontSize: '13px',
+              fontWeight: '600',
+              fontFamily: 'Inter, sans-serif'
+            },
+            formatter: function() {
+              return `${this.point.name}: ${this.y}`;
+            }
+          },
+          states: {
+            hover: {
+              brightness: 0.1,
+              halo: {
+                size: 8,
+                opacity: 0.25
+              }
+            }
+          }
+        }
+      },
+      series: [{
+        name: title,
+        data: data
+      }]
+    });
   }
-
-  function buildLatestTable(items){
-    const tbody=$('#tbl-latest tbody'); tbody.innerHTML='';
-    const sorted=[...items].sort((a,b)=>new Date(b.triggeredTime)-new Date(a.triggeredTime)).slice(0,50);
-    $('#count-latest').textContent=sorted.length;
-    for(const it of sorted){
-      const tr=document.createElement('tr');
+  
+  function buildCharts(items) {
+    const byType = {
+      VSphereHost: {},
+      VSphereDatastore: {},
+      VSphereVm: {}
+    };
+    
+    for (const it of items) {
+      const t = it.alarmSource?.objectType;
+      const st = normalizeStatus(it.status);
+      if (byType[t]) {
+        byType[t][st] = (byType[t][st] || 0) + 1;
+      }
+    }
+    
+    renderDonut('chart-hosts', 'Host status', byType['VSphereHost']);
+    renderDonut('chart-ds', 'Datastore status', byType['VSphereDatastore']);
+    renderDonut('chart-vms', 'VM status', byType['VSphereVm']);
+  }
+  
+  function buildLatestTable(items) {
+    const tbody = $('#tbl-latest tbody');
+    tbody.innerHTML = '';
+    
+    const sorted = [...items]
+      .sort((a, b) => new Date(b.triggeredTime) - new Date(a.triggeredTime))
+      .slice(0, 50);
+    
+    $('#count-latest').textContent = sorted.length;
+    
+    for (const it of sorted) {
+      const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><span class="pill ${pillClass(it.status)}">${it.status}</span></td>
-        <td>${fmt(it.triggeredTime)}</td>
-        <td>${esc(it.alarmSource?.objectName||'')}</td>
-        <td>${esc(it.name||'')}</td>
-        <td title="${esc(it.description||'')}">${esc(cut(it.description||'',140))}</td>`;
+        <td><span class="pill ${pillClass(it.status)}">${escapeHtml(it.status)}</span></td>
+        <td>${formatDate(it.triggeredTime)}</td>
+        <td>${escapeHtml(it.alarmSource?.objectName || '')}</td>
+        <td>${escapeHtml(it.name || '')}</td>
+        <td title="${escapeHtml(it.description || '')}">${escapeHtml(truncate(it.description || '', 140))}</td>
+      `;
       tbody.appendChild(tr);
     }
   }
-
-  function buildObjectsTable(items){
-    const map=new Map();
-    for(const it of items){
-      const src=it.alarmSource||{};
+  
+  function buildObjectsTable(items) {
+    const map = new Map();
+    
+    for (const it of items) {
+      const src = it.alarmSource || {};
       const key = `${src.objectType}|${src.objectName}`;
-      const st=normalizeStatus(it.status);
-      if(!map.has(key)){
-        map.set(key,{objectName:src.objectName,objectType:src.objectType,Error:0,Warning:0,Information:0,Acknowledged:0,Resolved:0,Total:0});
+      const st = normalizeStatus(it.status);
+      
+      if (!map.has(key)) {
+        map.set(key, {
+          objectName: src.objectName,
+          objectType: src.objectType,
+          Error: 0,
+          Warning: 0,
+          Information: 0,
+          Acknowledged: 0,
+          Resolved: 0,
+          Total: 0
+        });
       }
-      const row=map.get(key); row[st]=(row[st]||0)+1; row.Total+=1;
+      
+      const row = map.get(key);
+      row[st] = (row[st] || 0) + 1;
+      row.Total += 1;
     }
-    const rows=Array.from(map.values()).sort((a,b)=>b.Total-a.Total).slice(0,100);
-    $('#count-objects').textContent=rows.length;
-    const tbody=$('#tbl-objects tbody'); tbody.innerHTML='';
-    for(const r of rows){
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${esc(r.objectName||'')}</td><td>${esc(r.objectType||'')}</td>
-                    <td>${r.Error||0}</td><td>${r.Warning||0}</td><td>${r.Information||0}</td>
-                    <td>${r.Acknowledged||0}</td><td>${r.Resolved||0}</td><td><strong>${r.Total}</strong></td>`;
+    
+    const rows = Array.from(map.values())
+      .sort((a, b) => b.Total - a.Total)
+      .slice(0, 100);
+    
+    $('#count-objects').textContent = rows.length;
+    
+    const tbody = $('#tbl-objects tbody');
+    tbody.innerHTML = '';
+    
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(r.objectName || '')}</td>
+        <td>${escapeHtml(r.objectType || '')}</td>
+        <td>${r.Error || 0}</td>
+        <td>${r.Warning || 0}</td>
+        <td>${r.Information || 0}</td>
+        <td>${r.Acknowledged || 0}</td>
+        <td>${r.Resolved || 0}</td>
+        <td><strong>${r.Total}</strong></td>
+      `;
       tbody.appendChild(tr);
     }
   }
-
-  async function loadDataJson(){
+  
+  async function loadDataJson() {
     const url = `data.json?_=${Date.now()}`;
-    const r = await fetch(url, { cache:'no-store' });
-    if(!r.ok) throw new Error(`data.json ${r.status} ${r.statusText}`);
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`data.json ${r.status} ${r.statusText}`);
     return r.json();
   }
-
+  
   let __timer = null;
-  function startAutoRefresh(sec){
-    if (__timer) { clearInterval(__timer); __timer = null; }
-    if (sec && Number(sec) > 0){
+  
+  function startAutoRefresh(sec) {
+    if (__timer) {
+      clearInterval(__timer);
+      __timer = null;
+    }
+    if (sec && Number(sec) > 0) {
       __timer = setInterval(refreshAll, Number(sec) * 1000);
     }
   }
-
-  async function refreshAll(){
-  try{
-    const data  = await loadDataJson();
-    const raw       = Array.isArray(data.items) ? data.items : [];
-    const typeKey   = document.querySelector('#filterType').value;
-    const statuses  = getSelectedStatuses();
-
-    const typePred = (FILTERS[typeKey] || FILTERS.all);
-    const allowed  = new Set(statuses.length ? statuses : ['Error','Warning','Information','Acknowledged','Resolved']);
-    const items    = raw.filter(it => typePred(it?.alarmSource?.objectType) && allowed.has(normalizeStatus(it?.status)));
-
-    buildCharts(items);
-    buildLatestTable(items);
-    buildObjectsTable(items);
-
-    const typeLabel = { all:'All', vsphere:'vSphere', vbr:'VBR', vb365:'VB365' }[typeKey] || typeKey;
-    const statLabel = statuses.length ? statuses.join(', ') : 'All';
-    setStatus(`Updated ${new Date(data.generatedAt).toLocaleString()} — showing ${items.length}/${raw.length} (Type: ${typeLabel}, Status: ${statLabel})`, true);
-  }catch(err){
-    setStatus(String(err), false);
+  
+  async function refreshAll() {
+    try {
+      const data = await loadDataJson();
+      const raw = Array.isArray(data.items) ? data.items : [];
+      const typeKey = $('#filterType').value;
+      const statuses = getSelectedStatuses();
+      
+      const typePred = FILTERS[typeKey] || FILTERS.all;
+      const allowed = new Set(statuses.length ? statuses : ['Error', 'Warning', 'Information', 'Acknowledged', 'Resolved']);
+      const items = raw.filter(it => typePred(it?.alarmSource?.objectType) && allowed.has(normalizeStatus(it?.status)));
+      
+      buildCharts(items);
+      buildLatestTable(items);
+      buildObjectsTable(items);
+      
+      const typeLabel = { all: 'All', vsphere: 'vSphere', vbr: 'VBR', vb365: 'VB365' }[typeKey] || typeKey;
+      const statLabel = statuses.length ? statuses.join(', ') : 'All';
+      setStatus(`Updated ${new Date(data.generatedAt).toLocaleString()} — ${items.length}/${raw.length} alarms (${typeLabel}, ${statLabel})`, true);
+    } catch (err) {
+      setStatus(String(err), false);
+    }
   }
-}
-
-
-window.addEventListener('DOMContentLoaded', ()=> {
-  refreshAll();
-
-  const sel = document.querySelector('#refreshSel');
-  startAutoRefresh(Number(sel.value));
-  document.querySelector('#btnRefreshNow').addEventListener('click', refreshAll);
-  sel.addEventListener('change', e => startAutoRefresh(Number(e.target.value)));
-  document.querySelector('#filterType').addEventListener('change', refreshAll);
-
-  const multi = document.getElementById('statusMulti');
-  const menu  = document.getElementById('statusMenu');
-  const btn   = document.getElementById('statusBtn');
-
-  btn.addEventListener('click', (e)=>{ e.stopPropagation(); menu.classList.toggle('open'); });
-  document.addEventListener('click', (e)=>{ if (!multi.contains(e.target)) menu.classList.remove('open'); });
-
-  menu.addEventListener('change', (e)=>{ syncStatusAll(e); refreshAll(); });
-
-  updateStatusBtnLabel();
-});
-
-
+  
+  window.addEventListener('DOMContentLoaded', () => {
+    refreshAll();
+    
+    const sel = $('#refreshSel');
+    startAutoRefresh(Number(sel.value));
+    
+    $('#btnRefreshNow').addEventListener('click', refreshAll);
+    sel.addEventListener('change', e => startAutoRefresh(Number(e.target.value)));
+    $('#filterType').addEventListener('change', refreshAll);
+    
+    const multi = $('#statusMulti');
+    const menu = $('#statusMenu');
+    const btn = $('#statusBtn');
+    
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      menu.classList.toggle('open');
+    });
+    
+    document.addEventListener('click', (e) => {
+      if (!multi.contains(e.target)) {
+        menu.classList.remove('open');
+      }
+    });
+    
+    menu.addEventListener('change', (e) => {
+      syncStatusAll(e);
+      refreshAll();
+    });
+    
+    updateStatusBtnLabel();
+  });
 })();
 </script>
 </body>
